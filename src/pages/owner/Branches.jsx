@@ -64,6 +64,13 @@ export default function OwnerBranches() {
   const [modalErr,    setModalErr]    = useState('')
   const [modalSaving, setModalSaving] = useState(false)
 
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 768)
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+
   // ── FETCH ─────────────────────────────────────────────────
   const fetchBranches = useCallback(async () => {
     if (!profile) return
@@ -225,9 +232,10 @@ export default function OwnerBranches() {
       <NotificationBell isAr={isAr} />
       <SubscriptionGuard isExpired={isExpired} isAr={isAr}>
         <button onClick={() => setShowModal(true)} disabled={atBranchLimit}
+          aria-label={isAr ? 'إضافة فرع' : 'Add branch'}
           title={atBranchLimit ? (isAr ? `وصلت إلى الحد الأقصى (${subscription.branches_limit} فروع)` : `Branch limit reached (${subscription.branches_limit} branches)`) : undefined}
-          style={{ background: atBranchLimit ? '#9CA3AF' : '#1B4332', color:'#fff', border:'none', padding:'8px 16px', borderRadius:10, fontSize:13, fontWeight:600, cursor: atBranchLimit ? 'not-allowed' : 'pointer', display:'flex', alignItems:'center', gap:6, fontFamily:'inherit' }}>
-          + {isAr ? 'إضافة فرع' : 'Add Branch'}
+          style={{ background: atBranchLimit ? '#9CA3AF' : '#1B4332', color:'#fff', border:'none', padding: isMobile ? '8px' : '8px 16px', borderRadius:10, fontSize:13, fontWeight:600, cursor: atBranchLimit ? 'not-allowed' : 'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:6, fontFamily:'inherit', minWidth: isMobile ? 44 : 'auto', minHeight: isMobile ? 44 : 'auto' }}>
+          {isMobile ? '+' : (isAr ? '+ إضافة فرع' : '+ Add Branch')}
         </button>
       </SubscriptionGuard>
     </div>

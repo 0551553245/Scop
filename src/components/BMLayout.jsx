@@ -4,6 +4,8 @@ import { useBranchManagerAuth } from '../context/BranchManagerAuthContext'
 import { useLanguage } from '../context/LanguageContext'
 import { prefetchBMDailyTasks } from '../lib/prefetch'
 
+const DVH = window.CSS?.supports('height', '100dvh') ? '100dvh' : '100vh'
+
 const NAV = [
   { icon:'⊞', label:'Dashboard',      labelAr:'لوحة التحكم',      path:'/branch-manager/dashboard'     },
   { icon:'✓',  label:"Today's Tasks", labelAr:'مهام اليوم',       path:'/branch-manager/daily-tasks'   },
@@ -31,20 +33,6 @@ export default function BMLayout({ activePath, title, titleAr, subtitle, branchN
   const initials = (profile?.name || 'M').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
   const displayBranch = branchName || '—'
 
-  const defaultTopbarLeft = (
-    <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-      {isMobile && (
-        <button
-          onClick={() => setSidebarOpen(p => !p)}
-          style={{ background:'none', border:'none', cursor:'pointer', padding:'8px', fontSize:20, color:'#111827', display:'flex', alignItems:'center', minWidth:44, minHeight:44, justifyContent:'center' }}
-        >
-          ☰
-        </button>
-      )}
-      <div style={{ fontSize:14, fontWeight:500, color:'#111827' }}>{isAr ? titleAr || title : title}</div>
-      {subtitle != null && <div style={{ fontSize:11, color:'#9CA3AF' }}>{subtitle}</div>}
-    </div>
-  )
 
   const sidebarStyle = {
     width: 200,
@@ -58,7 +46,7 @@ export default function BMLayout({ activePath, title, titleAr, subtitle, branchN
       position: 'fixed',
       top: 0,
       [isAr ? 'right' : 'left']: 0,
-      height: '100vh',
+      height: DVH,
       zIndex: 1000,
       transform: `translateX(${isAr ? (sidebarOpen ? 0 : 220) : (sidebarOpen ? 0 : -220)}px)`,
       transition: 'transform 0.3s ease',
@@ -122,7 +110,22 @@ export default function BMLayout({ activePath, title, titleAr, subtitle, branchN
       {/* ── MAIN ── */}
       <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
         <div style={{ background:'#fff', borderBottom:'0.5px solid #E5E7EB', padding:'0 20px', height:52, display:'flex', alignItems:'center', justifyContent:'space-between', flexShrink:0 }}>
-          {topbarLeft || defaultTopbarLeft}
+          <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+            {isMobile && (
+              <button
+                onClick={() => setSidebarOpen(p => !p)}
+                style={{ background:'none', border:'none', cursor:'pointer', padding:'8px', fontSize:20, color:'#111827', display:'flex', alignItems:'center', minWidth:44, minHeight:44, justifyContent:'center' }}
+              >
+                ☰
+              </button>
+            )}
+            {topbarLeft || (
+              <>
+                <div style={{ fontSize:14, fontWeight:500, color:'#111827' }}>{isAr ? titleAr || title : title}</div>
+                {subtitle != null && <div style={{ fontSize:11, color:'#9CA3AF' }}>{subtitle}</div>}
+              </>
+            )}
+          </div>
           <div style={{ display:'flex', alignItems:'center', gap:10 }}>
             <button onClick={toggleLang} style={{ fontSize:11, color:'#6B7280', background:'#F9FAFB', border:'0.5px solid #E5E7EB', padding:'4px 10px', borderRadius:20, cursor:'pointer', fontFamily:'inherit', minHeight:44, display:'flex', alignItems:'center' }}>
               {isAr?'EN':'EN / ع'}

@@ -4,7 +4,7 @@ import { supabaseAdmin, supabaseTemp } from '../../lib/supabase'
 import { useAdminAuth } from '../../context/AdminAuthContext'
 import { useLanguage } from '../../context/LanguageContext'
 import { getPlatformSettings, getPlanLimits } from '../../lib/platformSettings'
-import { AdminSidebar } from '../../components/AdminLayout'
+import AdminLayout from '../../components/AdminLayout'
 import { formatDate, daysLeft, calculateExpiry } from '../../lib/adminHelpers'
 
 const PLAN_BADGE = {
@@ -484,29 +484,16 @@ export default function AdminRestaurants() {
   })
 
   if (loading && mgLoading) return (
-    <div dir={isAr?'rtl':'ltr'} style={{ display:'flex', height:'100vh', background:'#F0FDF4', fontFamily:"'Inter',sans-serif" }}>
-      <div style={{ width:200, background:'#fff', borderRight:'0.5px solid #E5E7EB', flexShrink:0 }} />
-      <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
-        <div style={{ height:56, background:'#fff', borderBottom:'0.5px solid #E5E7EB', flexShrink:0 }} />
-        <div style={{ flex:1, padding:'20px 24px', overflowY:'auto' }}>
-          <div className="skeleton" style={{ height:420 }} />
-        </div>
+    <AdminLayout currentPath="/admin/restaurants" profile={profile} isAr={isAr} handleSignOut={handleSignOut} title="Restaurants" titleAr="المطاعم">
+      <div style={{ padding:'20px 24px' }}>
+        <div className="skeleton" style={{ height:420 }} />
       </div>
-      <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}} .skeleton{background:#E5E7EB;border-radius:12px;animation:pulse 1.5s ease-in-out infinite}`}</style>
-    </div>
+    </AdminLayout>
   )
 
   return (
-    <div dir={isAr ? 'rtl' : 'ltr'} style={{ display:'flex', height:'100vh', minHeight:700, overflow:'hidden', background:'#F0FDF4', fontFamily: isAr ? "'Cairo','Segoe UI',sans-serif" : "'Inter','Segoe UI',sans-serif" }}>
-
-      <AdminSidebar currentPath="/admin/restaurants" profile={profile} isAr={isAr} handleSignOut={handleSignOut} />
-
-      <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
-
-        {/* Topbar */}
-        <div style={{ background:'#fff', borderBottom:'0.5px solid #E5E7EB', padding:'0 24px', height:56, display:'flex', alignItems:'center', justifyContent:'space-between', flexShrink:0, gap:12, flexWrap:'wrap' }}>
-          <span style={{ fontSize:15, fontWeight:700, color:'#111827' }}>{isAr ? 'المطاعم' : 'Restaurants'}</span>
-          <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+    <AdminLayout currentPath="/admin/restaurants" profile={profile} isAr={isAr} handleSignOut={handleSignOut} title="Restaurants" titleAr="المطاعم" topbarRight={
+      <div style={{ display:'flex', alignItems:'center', gap:8 }}>
             {activeTab === 'owners' ? (
               <>
                 <input
@@ -551,11 +538,9 @@ export default function AdminRestaurants() {
                 </button>
               </>
             )}
-          </div>
-        </div>
-
-        {/* Content */}
-        <div style={{ flex:1, overflowY:'auto', padding:'20px 24px' }}>
+      </div>
+    }>
+      <div style={{ padding:'20px 24px' }}>
 
           {/* Tab strip */}
           <div style={{ display:'flex', marginBottom:20, borderBottom:'0.5px solid #E5E7EB' }}>
@@ -746,10 +731,9 @@ export default function AdminRestaurants() {
               </div>
             </>
           )}
-        </div>
       </div>
 
-      {/* ── MANAGE DRAWER ── */}
+    {/* ── MANAGE DRAWER ── */}
       {drawerOwner && (
         <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.4)', zIndex:1000, display:'flex', justifyContent: isAr ? 'flex-start' : 'flex-end' }}
           onClick={e => { if (e.target === e.currentTarget) closeDrawer() }}>
@@ -929,13 +913,6 @@ export default function AdminRestaurants() {
         </div>
       )}
 
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Cairo:wght@400;500;600;700;800&display=swap');
-        @keyframes spin { to { transform: rotate(360deg); } }
-        @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
-        .skeleton{background:#E5E7EB;border-radius:12px;animation:pulse 1.5s ease-in-out infinite}
-        a { text-decoration: none; }
-      `}</style>
-    </div>
+  </AdminLayout>
   )
 }

@@ -6,7 +6,7 @@ import { useLanguage } from '../../context/LanguageContext'
 import { getCached, setCached, invalidateCache } from '../../lib/cache'
 import { calcRate } from '../../lib/stats'
 import { getPlanLimits } from '../../lib/platformSettings'
-import { AdminSidebar } from '../../components/AdminLayout'
+import AdminLayout from '../../components/AdminLayout'
 import { daysLeft } from '../../lib/adminHelpers'
 
 // ─── helpers ────────────────────────────────────────────────────────────────
@@ -295,25 +295,20 @@ export default function AdminDashboard() {
   // ── loading ──────────────────────────────────────────────────────────────
 
   if (loading) return (
-    <div dir={isAr ? 'rtl' : 'ltr'} style={{ display:'flex', height:'100vh', background:'#F0FDF4', fontFamily:"Inter,sans-serif" }}>
-      <div style={{ width:200, background:'#fff', borderRight:'0.5px solid #E5E7EB', flexShrink:0 }} />
-      <div style={{ flex:1, display:'flex', flexDirection:'column' }}>
-        <div style={{ height:56, background:'#fff', borderBottom:'0.5px solid #E5E7EB' }} />
-        <div style={{ flex:1, padding:'20px 24px', display:'flex', flexDirection:'column', gap:16 }}>
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12 }}>
-            {[0,1,2,3].map(i => <div key={i} className="skeleton" style={{ height:100, borderRadius:12 }} />)}
-          </div>
-          <div style={{ display:'grid', gridTemplateColumns:'1.6fr 1fr', gap:12 }}>
-            <div className="skeleton" style={{ height:220, borderRadius:12 }} />
-            <div className="skeleton" style={{ height:220, borderRadius:12 }} />
-          </div>
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:12 }}>
-            {[0,1,2].map(i => <div key={i} className="skeleton" style={{ height:90, borderRadius:12 }} />)}
-          </div>
+    <AdminLayout currentPath="/admin/dashboard" profile={profile} isAr={isAr} handleSignOut={handleSignOut} title="Dashboard" titleAr="لوحة التحكم">
+      <div style={{ padding:'20px 24px', display:'flex', flexDirection:'column', gap:16 }}>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12 }}>
+          {[0,1,2,3].map(i => <div key={i} className="skeleton" style={{ height:100, borderRadius:12 }} />)}
+        </div>
+        <div style={{ display:'grid', gridTemplateColumns:'1.6fr 1fr', gap:12 }}>
+          <div className="skeleton" style={{ height:220, borderRadius:12 }} />
+          <div className="skeleton" style={{ height:220, borderRadius:12 }} />
+        </div>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:12 }}>
+          {[0,1,2].map(i => <div key={i} className="skeleton" style={{ height:90, borderRadius:12 }} />)}
         </div>
       </div>
-      <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}.skeleton{background:#E5E7EB;animation:pulse 1.5s ease-in-out infinite}`}</style>
-    </div>
+    </AdminLayout>
   )
 
   // ── destructure ──────────────────────────────────────────────────────────
@@ -336,21 +331,12 @@ export default function AdminDashboard() {
   // ── render ───────────────────────────────────────────────────────────────
 
   return (
-    <div dir={isAr ? 'rtl' : 'ltr'} style={{ display:'flex', height:'100vh', overflow:'hidden', background:'#F0FDF4', fontFamily: isAr ? "'Cairo','Segoe UI',sans-serif" : "'Inter','Segoe UI',sans-serif" }}>
-
-      <AdminSidebar currentPath="/admin/dashboard" profile={profile} isAr={isAr} handleSignOut={handleSignOut} />
-
-      <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
-
-        {/* topbar */}
-        <div style={{ background:'#fff', borderBottom:'0.5px solid #E5E7EB', padding:'0 24px', height:56, display:'flex', alignItems:'center', justifyContent:'space-between', flexShrink:0 }}>
-          <div style={{ fontSize:15, fontWeight:700, color:'#111827' }}>{isAr ? 'لوحة التحكم' : 'Dashboard'}</div>
-          <button onClick={toggleLang} style={{ fontSize:12, color:'#6B7280', background:'#F9FAFB', border:'0.5px solid #E5E7EB', padding:'4px 12px', borderRadius:20, cursor:'pointer', fontFamily:'inherit' }}>
-            {isAr ? 'EN' : 'ع'}
-          </button>
-        </div>
-
-        <div style={{ flex:1, overflowY:'auto', padding:'20px 24px', display:'flex', flexDirection:'column', gap:16 }}>
+    <AdminLayout currentPath="/admin/dashboard" profile={profile} isAr={isAr} handleSignOut={handleSignOut} title="Dashboard" titleAr="لوحة التحكم" topbarRight={
+      <button onClick={toggleLang} style={{ fontSize:12, color:'#6B7280', background:'#F9FAFB', border:'0.5px solid #E5E7EB', padding:'4px 12px', borderRadius:20, cursor:'pointer', fontFamily:'inherit' }}>
+        {isAr ? 'EN' : 'ع'}
+      </button>
+    }>
+      <div style={{ padding:'20px 24px', display:'flex', flexDirection:'column', gap:16 }}>
 
           {/* error */}
           {error && (
@@ -637,12 +623,7 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-        </div>
       </div>
-
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Cairo:wght@400;500;600;700;800&display=swap');
-      `}</style>
-    </div>
+    </AdminLayout>
   )
 }

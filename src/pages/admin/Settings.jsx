@@ -4,7 +4,7 @@ import { supabaseAdmin } from '../../lib/supabase'
 import { useAdminAuth } from '../../context/AdminAuthContext'
 import { useLanguage } from '../../context/LanguageContext'
 import { invalidateSettingsCache } from '../../lib/platformSettings'
-import { AdminSidebar } from '../../components/AdminLayout'
+import AdminLayout from '../../components/AdminLayout'
 
 const inputStyle = {
   width:'100%', padding:'9px 12px', fontSize:13,
@@ -127,33 +127,20 @@ export default function AdminSettings() {
   }
 
   if (loading) return (
-    <div dir={isAr?'rtl':'ltr'} style={{ display:'flex', height:'100vh', background:'#F0FDF4', fontFamily:"'Inter',sans-serif" }}>
-      <div style={{ width:200, background:'#fff', borderRight:'0.5px solid #E5E7EB', flexShrink:0 }} />
-      <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
-        <div style={{ height:56, background:'#fff', borderBottom:'0.5px solid #E5E7EB', flexShrink:0 }} />
-        <div style={{ flex:1, padding:'20px 24px', overflowY:'auto' }}>
-          <div className="skeleton" style={{ height:420 }} />
-        </div>
+    <AdminLayout currentPath="/admin/settings" profile={profile} isAr={isAr} handleSignOut={handleSignOut} title="Settings" titleAr="الإعدادات">
+      <div style={{ padding:'20px 24px' }}>
+        <div className="skeleton" style={{ height:420 }} />
       </div>
-      <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}} .skeleton{background:#E5E7EB;border-radius:12px;animation:pulse 1.5s ease-in-out infinite}`}</style>
-    </div>
+    </AdminLayout>
   )
 
   return (
-    <div dir={isAr ? 'rtl' : 'ltr'} style={{ display:'flex', height:'100vh', minHeight:700, overflow:'hidden', background:'#F0FDF4', fontFamily: isAr ? "'Cairo','Segoe UI',sans-serif" : "'Inter','Segoe UI',sans-serif" }}>
-
-      <AdminSidebar currentPath="/admin/settings" profile={profile} isAr={isAr} handleSignOut={handleSignOut} />
-
-      <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
-
-        <div style={{ background:'#fff', borderBottom:'0.5px solid #E5E7EB', padding:'0 24px', height:56, display:'flex', alignItems:'center', justifyContent:'space-between', flexShrink:0 }}>
-          <span style={{ fontSize:15, fontWeight:700, color:'#111827' }}>{isAr ? 'الإعدادات' : 'Settings'}</span>
-          <button onClick={toggleLang} style={{ fontSize:12, color:'#6B7280', background:'#F9FAFB', border:'0.5px solid #E5E7EB', padding:'6px 14px', borderRadius:20, cursor:'pointer', fontFamily:'inherit' }}>
-            {isAr ? 'EN' : 'ع'}
-          </button>
-        </div>
-
-        <div style={{ flex:1, overflowY:'auto', padding:'20px 24px' }}>
+    <AdminLayout currentPath="/admin/settings" profile={profile} isAr={isAr} handleSignOut={handleSignOut} title="Settings" titleAr="الإعدادات" topbarRight={
+      <button onClick={toggleLang} style={{ fontSize:12, color:'#6B7280', background:'#F9FAFB', border:'0.5px solid #E5E7EB', padding:'6px 14px', borderRadius:20, cursor:'pointer', fontFamily:'inherit' }}>
+        {isAr ? 'EN' : 'ع'}
+      </button>
+    }>
+      <div style={{ padding:'20px 24px' }}>
 
           {error && (
             <div style={{ background:'#FFF1F2', border:'0.5px solid #FECDD3', borderRadius:12, padding:'12px 16px', marginBottom:16, color:'#9F1239', fontSize:13 }}>{error}</div>
@@ -229,13 +216,6 @@ export default function AdminSettings() {
             </button>
           </form>
         </div>
-      </div>
-
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Cairo:wght@400;500;600;700;800&display=swap');
-        @keyframes spin { to { transform: rotate(360deg); } }
-        a { text-decoration: none; }
-      `}</style>
-    </div>
+    </AdminLayout>
   )
 }

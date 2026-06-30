@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 
+const DVH = window.CSS?.supports('height', '100dvh') ? '100dvh' : '100vh'
+
 export const NAV = [
   { icon: 'ti-layout-dashboard', label: 'Dashboard',     labelAr: 'لوحة التحكم',  path: '/admin/dashboard'     },
   { icon: 'ti-building-store',   label: 'Restaurants',   labelAr: 'المطاعم',      path: '/admin/restaurants'   },
@@ -27,7 +29,7 @@ export function AdminSidebar({ currentPath, profile, isAr, handleSignOut, isMobi
       position: 'fixed',
       top: 0,
       [isAr ? 'right' : 'left']: 0,
-      height: '100vh',
+      height: DVH,
       zIndex: 1000,
       transform: `translateX(${isAr ? (isOpen ? 0 : 200) : (isOpen ? 0 : -200)}px)`,
       transition: 'transform 0.3s ease',

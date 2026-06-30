@@ -49,6 +49,9 @@ export default function OwnerTaskManagement() {
   const [lightboxUrl,   setLightboxUrl]   = useState(null)
   const [expandedPhotos,setExpandedPhotos]= useState({})
 
+  const [isMobile,       setIsMobile]       = useState(window.innerWidth < 768)
+  const [showMobileForm, setShowMobileForm] = useState(false)
+
   // ── CREATE FORM ───────────────────────────────────────────
   const [tplIdx,       setTplIdx]       = useState(null)
   const [taskName,     setTaskName]     = useState('')
@@ -158,6 +161,12 @@ export default function OwnerTaskManagement() {
       .subscribe()
     return () => supabaseOwner.removeChannel(ch)
   }, [profile?.id, fetchData])
+
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 768)
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
 
   // ── PICK TEMPLATE ─────────────────────────────────────────
   function pickTemplate(idx) {
@@ -317,11 +326,21 @@ export default function OwnerTaskManagement() {
     <OwnerLayout activePath="/owner/tasks" title="Task Management" titleAr="إدارة المهام"
       topbarLeft={tasksTopbarLeft} branches={branches}>
 
-      {/* Content — split layout */}
+      {/* Content — split on desktop, single panel on mobile */}
       <div style={{ height:'100%', display:'flex', overflow:'hidden' }}>
 
-          {/* LEFT — Grid Table */}
-          <div style={{ flex:1, overflowY:'auto', padding:'20px 20px 20px 24px' }}>
+          {/* LEFT — Grid (hidden on mobile when form is open) */}
+          {(!isMobile || !showMobileForm) && (
+          <div style={{ flex:1, overflowY:'auto', padding: isMobile ? '16px' : '20px 20px 20px 24px' }}>
+
+            {isMobile && (
+              <button
+                onClick={() => setShowMobileForm(true)}
+                style={{ width:'100%', marginBottom:16, padding:'12px', background:'#1B4332', color:'#fff', border:'none', borderRadius:12, fontSize:14, fontWeight:700, cursor:'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}
+              >
+                + {isAr ? 'مهمة جديدة' : 'New Task'}
+              </button>
+            )}
 
             {error && (
               <div style={{ background:'#FFF1F2', border:'1px solid #FECDD3', borderRadius:12, padding:'12px 16px', marginBottom:16, color:'#9F1239', fontSize:13, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
@@ -336,7 +355,7 @@ export default function OwnerTaskManagement() {
               <div style={{ background:'#fff', border:'1px solid #E5E7EB', borderRadius:18, padding:40, textAlign:'center', marginTop:20 }}>
                 <div style={{ fontSize:40, marginBottom:12 }}>✓</div>
                 <div style={{ fontSize:15, fontWeight:700, color:'#111827', marginBottom:6 }}>{isAr?'لا توجد مهام بعد':'No tasks yet'}</div>
-                <div style={{ fontSize:13, color:'#6B7280' }}>{isAr?'أنشئ مهمتك الأولى من اللوحة على اليمين':'Create your first task using the panel on the right'}</div>
+                <div style={{ fontSize:13, color:'#6B7280' }}>{isAr ? (isMobile ? 'اضغط زر "مهمة جديدة" أعلاه للبدء' : 'أنشئ مهمتك الأولى من اللوحة على اليمين') : (isMobile ? 'Tap "+ New Task" above to get started' : 'Create your first task using the panel on the right')}</div>
               </div>
             ) : (
               <>
@@ -557,9 +576,19 @@ export default function OwnerTaskManagement() {
               </>
             )}
           </div>
+          )}
 
-          {/* RIGHT — Create task panel (unchanged) */}
-          <div style={{ width:340, background:'#fff', borderLeft:'1px solid #E5E7EB', overflowY:'auto', padding:24, flexShrink:0 }}>
+          {/* RIGHT — New Task form (full-screen on mobile) */}
+          {(!isMobile || showMobileForm) && (
+          <div style={{ width: isMobile ? '100%' : 340, background:'#fff', borderLeft: isMobile ? 'none' : '1px solid #E5E7EB', overflowY:'auto', padding: isMobile ? 16 : 24, flexShrink:0 }}>
+            {isMobile && (
+              <button
+                onClick={() => setShowMobileForm(false)}
+                style={{ display:'flex', alignItems:'center', gap:6, background:'none', border:'none', cursor:'pointer', fontSize:14, fontWeight:600, color:'#374151', fontFamily:'inherit', padding:'4px 0', marginBottom:16, minHeight:44 }}
+              >
+                {isAr ? 'رجوع →' : '← Back'}
+              </button>
+            )}
             <div style={{ fontSize:15, fontWeight:700, color:'#111827', marginBottom:4 }}>{isAr?'مهمة جديدة':'New Task'}</div>
             <div style={{ fontSize:11, color:'#9CA3AF', marginBottom:20 }}>{isAr?'اختر قالباً أو اكتب مهمتك':'Pick a template or write your own'}</div>
 
@@ -695,6 +724,7 @@ export default function OwnerTaskManagement() {
               </SubscriptionGuard>
             </form>
           </div>
+          )}
         </div>
 
       {/* ── LIGHTBOX ── */}

@@ -1034,4 +1034,24 @@ CREATE POLICY "manager_read_owner_subscription" ON public.subscriptions
 
 ---
 
-## Bug count: #038 – #130 (93 bugs total)
+## BUG #131 — HIGH: Hamburger menu missing on all non-Dashboard pages across all three panels
+**Files:** src/components/OwnerLayout.jsx, src/components/BMLayout.jsx, src/pages/admin/Dashboard.jsx, src/pages/admin/ActivityLog.jsx, src/pages/admin/Notifications.jsx, src/pages/admin/Analytics.jsx, src/pages/admin/Settings.jsx, src/pages/admin/Subscriptions.jsx, src/pages/admin/Restaurants.jsx
+**Symptom:** On mobile, the ☰ hamburger appeared only on Dashboard pages. Every other page had no way to open the sidebar, forcing users back to Dashboard to navigate.
+**Root cause (Owner/BM):** Hamburger was inside a `defaultTopbarLeft` variable that rendered as `{topbarLeft || defaultTopbarLeft}`. Any page passing a custom `topbarLeft` prop (4 Owner pages: Branches, FoodSafety, Managers, TaskManagement) silently displaced the hamburger.
+**Root cause (Admin):** All 7 non-login admin pages imported `{ AdminSidebar }` (named export) and built their own layout manually, bypassing `AdminLayout` (default export) which had the hamburger hardcoded. No `isMobile`/`sidebarOpen` state existed on those pages.
+**Fix (Owner/BM):** Moved hamburger button outside the `topbarLeft` prop slot into its own unconditional position in the topbar, so custom `topbarLeft` content can never displace it.
+**Fix (Admin):** Converted all 7 pages to use `AdminLayout` (default export). `position:fixed` modals (Restaurants, Subscriptions) became siblings of the content div inside AdminLayout — valid since `position:fixed` is viewport-relative.
+**Rule:** Hamburger/mobile-nav controls must never be placed inside a prop slot that pages can override. Always render them as a fixed part of the topbar structure, unconditionally.
+
+---
+
+## BUG #132 — HIGH: New Task form floated over grid on mobile in owner/TaskManagement.jsx
+**File:** src/pages/owner/TaskManagement.jsx
+**Symptom:** On mobile, the 340px-wide "New Task" form panel rendered alongside the task grid, leaving the grid in a ~35px unusable sliver. No way to see the grid or the form properly.
+**Root cause:** Desktop split layout (`flex:1` grid + `width:340` form) had no mobile breakpoint. Both panels always rendered side-by-side regardless of screen width.
+**Fix:** Added `isMobile` state (resize listener, `window.innerWidth < 768`) and `showMobileForm` toggle. On mobile: only one panel renders at a time — grid OR form. Grid shows a full-width "+ New Task" button; tapping it slides to the form (full width, no borderLeft, padding 16px). Form has a "← Back" button (44px min-height touch target) that returns to the grid. Desktop layout unchanged.
+**Rule:** Any side-by-side panel layout (content + form) must be made single-panel on mobile via conditional rendering, not CSS overlap. Use `isMobile` state + a toggle boolean for which panel is active.
+
+---
+
+## Bug count: #038 – #132 (95 bugs total)

@@ -52,6 +52,13 @@ export default function OwnerManagers() {
   const [modalSaving,  setModalSaving]  = useState(false)
   const [modalSuccess, setModalSuccess] = useState('')
 
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 768)
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+
   // ── FETCH ─────────────────────────────────────────────────
   const fetchData = useCallback(async () => {
     if (!profile) return
@@ -290,10 +297,11 @@ export default function OwnerManagers() {
         <button
           onClick={() => { setShowModal(true); setModalErr(''); setModalSuccess('') }}
           disabled={atManagerLimit}
+          aria-label={isAr ? 'إضافة مدير' : 'Add manager'}
           title={atManagerLimit ? (isAr ? `وصلت إلى الحد الأقصى (${subscription.managers_limit} مديرين)` : `Manager limit reached (${subscription.managers_limit} managers)`) : undefined}
-          style={{ background: atManagerLimit ? '#9CA3AF' : '#1B4332', color:'#fff', border:'none', padding:'8px 16px', borderRadius:10, fontSize:13, fontWeight:600, cursor: atManagerLimit ? 'not-allowed' : 'pointer', fontFamily:'inherit' }}
+          style={{ background: atManagerLimit ? '#9CA3AF' : '#1B4332', color:'#fff', border:'none', padding: isMobile ? '8px' : '8px 16px', borderRadius:10, fontSize:13, fontWeight:600, cursor: atManagerLimit ? 'not-allowed' : 'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', justifyContent:'center', minWidth: isMobile ? 44 : 'auto', minHeight: isMobile ? 44 : 'auto' }}
         >
-          + {isAr ? 'إضافة مدير' : 'Add Manager'}
+          {isMobile ? '+' : (isAr ? '+ إضافة مدير' : '+ Add Manager')}
         </button>
       </SubscriptionGuard>
     </div>

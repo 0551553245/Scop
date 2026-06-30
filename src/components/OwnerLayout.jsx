@@ -5,6 +5,8 @@ import { useLanguage } from '../context/LanguageContext'
 import { prefetchOwnerTasks } from '../lib/prefetch'
 import NotificationBell from './NotificationBell'
 
+const DVH = window.CSS?.supports('height', '100dvh') ? '100dvh' : '100vh'
+
 const NAV_ITEMS = [
   { icon:'⊞', label:'Dashboard',       labelAr:'لوحة التحكم',  path:'/owner/dashboard',    section:'main' },
   { icon:'🏪', label:'Branches',        labelAr:'الفروع',        path:'/owner/branches',     section:'main' },
@@ -39,21 +41,6 @@ export default function OwnerLayout({ activePath, title, titleAr, topbarLeft, to
   const name     = isAr ? profile?.name_ar || profile?.name : profile?.name || '—'
   const initials = (profile?.name || 'O').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
 
-  const defaultTopbarLeft = (
-    <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-      {isMobile && (
-        <button
-          onClick={() => setSidebarOpen(p => !p)}
-          style={{ background:'none', border:'none', cursor:'pointer', padding:'8px', fontSize:20, color:'#111827', display:'flex', alignItems:'center', minWidth:44, minHeight:44, justifyContent:'center' }}
-        >
-          ☰
-        </button>
-      )}
-      <div style={{ fontSize: 15, fontWeight: 700, color: '#111827' }}>
-        {isAr ? titleAr || title : title}
-      </div>
-    </div>
-  )
 
   const defaultTopbarRight = (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -76,7 +63,7 @@ export default function OwnerLayout({ activePath, title, titleAr, topbarLeft, to
       position: 'fixed',
       top: 0,
       [isAr ? 'right' : 'left']: 0,
-      height: '100vh',
+      height: DVH,
       zIndex: 1000,
       transform: `translateX(${isAr ? (sidebarOpen ? 0 : 220) : (sidebarOpen ? 0 : -220)}px)`,
       transition: 'transform 0.3s ease',
@@ -153,9 +140,19 @@ export default function OwnerLayout({ activePath, title, titleAr, topbarLeft, to
 
       {/* ── MAIN ── */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        <div style={{ background: '#fff', borderBottom: '1px solid #E5E7EB', padding: '0 24px', height: 56, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-          {topbarLeft || defaultTopbarLeft}
-          {topbarRight || defaultTopbarRight}
+        <div style={{ background: '#fff', borderBottom: '1px solid #E5E7EB', padding: isMobile ? '0 8px' : '0 24px', height: 56, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+            {isMobile && (
+              <button
+                onClick={() => setSidebarOpen(p => !p)}
+                style={{ background:'none', border:'none', cursor:'pointer', padding:'8px', fontSize:20, color:'#111827', display:'flex', alignItems:'center', minWidth:44, minHeight:44, justifyContent:'center' }}
+              >
+                ☰
+              </button>
+            )}
+            {topbarLeft || <div style={{ fontSize: 15, fontWeight: 700, color: '#111827' }}>{isAr ? titleAr || title : title}</div>}
+          </div>
+          <div style={{ flexShrink: 1, minWidth: 0 }}>{topbarRight || defaultTopbarRight}</div>
         </div>
         <div style={{ flex: 1, overflowY: 'auto' }}>
           {children}
