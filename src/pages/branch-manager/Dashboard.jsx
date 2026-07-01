@@ -110,7 +110,7 @@ export default function BranchManagerDashboard() {
 
     } catch (err) {
       console.error('BM Dashboard fetch error:', err)
-      if (!cached) setError('Failed to load dashboard.')
+      if (!cached) setError(isAr ? 'فشل تحميل لوحة التحكم' : 'Failed to load dashboard.')
     } finally {
       if (!cached) setLoading(false)
     }

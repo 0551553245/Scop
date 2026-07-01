@@ -140,7 +140,7 @@ export default function OwnerBranches() {
 
     } catch (err) {
       console.error('Branches fetch error:', err)
-      setError('Failed to load branches.')
+      setError(isAr ? 'فشل تحميل الفروع' : 'Failed to load branches.')
     } finally {
       setLoading(false)
     }

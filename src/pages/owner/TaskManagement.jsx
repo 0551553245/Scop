@@ -141,7 +141,7 @@ export default function OwnerTaskManagement() {
       setCached(cacheKey, { branches: branchList, tasks: taskList, subMap })
     } catch (err) {
       console.error('TaskManagement fetch error:', err)
-      setError('Failed to load tasks.')
+      setError(isAr ? 'فشل تحميل المهام' : 'Failed to load tasks.')
     } finally {
       setLoading(false)
     }
