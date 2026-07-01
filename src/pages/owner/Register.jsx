@@ -216,7 +216,10 @@ export default function OwnerRegister() {
       const { data: authData, error: authErr } = await supabaseTemp.auth.signUp({
         email: form.email,
         password: form.password,
-        options: { data: { name: form.ownerName } },
+        options: {
+          data:            { name: form.ownerName },
+          emailRedirectTo: 'https://scopsa.com/verify',
+        },
       })
       if (authErr) {
         if (authErr.message?.includes('already registered') || authErr.message?.includes('already been registered')) {
