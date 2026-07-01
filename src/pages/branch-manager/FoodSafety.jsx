@@ -100,7 +100,7 @@ export default function BMFoodSafety() {
       setStandards(merged)
       setCached(cacheKey, { branch: branchRes.data, standards: merged })
     } catch (err) {
-      console.error(err)
+      console.error('BM FoodSafety fetch error:', err)
       if (!cached) setError(isAr ? 'فشل تحميل معايير سلامة الغذاء' : 'Failed to load food safety standards.')
     } finally {
       if (!cached) setLoading(false)
@@ -174,7 +174,7 @@ export default function BMFoodSafety() {
       await fetchData()
 
     } catch (err) {
-      console.error(err)
+      console.error('BM FoodSafety submit error:', err)
       setError(isAr ? 'حدث خطأ. حاول مرة أخرى.' : 'Something went wrong. Please try again.')
     } finally {
       setSubmitting(p => ({ ...p, [stdId]: false }))

@@ -144,7 +144,7 @@ export default function OwnerManagers() {
       setManagers(enriched)
 
     } catch (err) {
-      console.error(err)
+      console.error('Managers fetch error:', err)
       setError(isAr ? 'فشل تحميل المديرين' : 'Failed to load managers.')
     } finally {
       setLoading(false)
@@ -262,7 +262,7 @@ export default function OwnerManagers() {
       await fetchData()
 
     } catch (err) {
-      console.error(err)
+      console.error('Managers action error:', err)
       setModalErr(isAr ? 'حدث خطأ. حاول مرة أخرى.' : 'Something went wrong. Please try again.')
     } finally {
       setModalSaving(false)

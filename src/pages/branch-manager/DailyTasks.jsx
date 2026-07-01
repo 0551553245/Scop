@@ -61,7 +61,7 @@ export default function BMDailyTasks() {
 
       setCached(cacheKey, { branch: branchData, tasks: merged })
     } catch (err) {
-      console.error(err)
+      console.error('BM DailyTasks fetch error:', err)
       if (!cached) setError('Failed to load tasks.')
     } finally {
       if (!cached) setLoading(false)

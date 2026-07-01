@@ -144,7 +144,7 @@ export default function OwnerSubscription() {
         whatsappNumber: waNum,
       })
     } catch (err) {
-      console.error(err)
+      console.error('Subscription fetch error:', err)
       if (!cached) setError(isAr ? 'فشل تحميل بيانات الاشتراك' : 'Failed to load subscription data.')
     } finally {
       if (!cached) setLoadingExtra(false)

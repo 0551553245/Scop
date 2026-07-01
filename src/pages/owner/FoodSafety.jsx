@@ -88,7 +88,7 @@ export default function OwnerFoodSafety() {
         setFsSubmissions(fsSubData || [])
       }
     } catch (err) {
-      console.error(err)
+      console.error('FoodSafety fetch error:', err)
       setError('Failed to load standards.')
     } finally {
       setLoading(false)

@@ -139,7 +139,7 @@ export default function OwnerBranches() {
       setBranchData(dataMap)
 
     } catch (err) {
-      console.error(err)
+      console.error('Branches fetch error:', err)
       setError('Failed to load branches.')
     } finally {
       setLoading(false)
@@ -200,7 +200,7 @@ export default function OwnerBranches() {
       await fetchBranches()
 
     } catch (err) {
-      console.error(err)
+      console.error('Branches delete error:', err)
       setModalErr(isAr ? 'حدث خطأ. حاول مرة أخرى.' : 'Something went wrong. Please try again.')
     } finally {
       setModalSaving(false)

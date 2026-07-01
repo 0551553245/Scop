@@ -64,7 +64,7 @@ export default function BranchManagerMonthlyTasks() {
 
       setCached(cacheKey, { branch: branchData, tasks: merged })
     } catch (err) {
-      console.error(err)
+      console.error('BM MonthlyTasks fetch error:', err)
       if (!cached) setError(isAr ? 'فشل تحميل المهام' : 'Failed to load tasks.')
     } finally {
       if (!cached) setLoading(false)

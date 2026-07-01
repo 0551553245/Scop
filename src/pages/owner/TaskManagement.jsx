@@ -140,7 +140,7 @@ export default function OwnerTaskManagement() {
       setTaskSubMap(subMap)
       setCached(cacheKey, { branches: branchList, tasks: taskList, subMap })
     } catch (err) {
-      console.error(err)
+      console.error('TaskManagement fetch error:', err)
       setError('Failed to load tasks.')
     } finally {
       setLoading(false)
@@ -235,7 +235,7 @@ export default function OwnerTaskManagement() {
       await fetchData()
 
     } catch (err) {
-      console.error(err)
+      console.error('TaskManagement save error:', err)
       setSaveErr(isAr ? 'حدث خطأ. حاول مرة أخرى.' : 'Something went wrong. Please try again.')
     } finally {
       setSaving(false)

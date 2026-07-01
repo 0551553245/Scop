@@ -115,7 +115,7 @@ export default function BMSchedule() {
       setEvents(evRes.data || [])
       setCached(cacheKey, { branch: branchRes.data, events: evRes.data || [] })
     } catch (err) {
-      console.error(err)
+      console.error('BM Schedule fetch error:', err)
       if (!cached) setError(isAr ? 'فشل تحميل الجدول' : 'Failed to load schedule.')
     } finally {
       if (!cached) setLoading(false)

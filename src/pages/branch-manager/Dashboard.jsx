@@ -109,7 +109,7 @@ export default function BranchManagerDashboard() {
       setCached(cacheKey, { branch: branchData, stats: computed, nextEvent: nextEventData })
 
     } catch (err) {
-      console.error(err)
+      console.error('BM Dashboard fetch error:', err)
       if (!cached) setError('Failed to load dashboard.')
     } finally {
       if (!cached) setLoading(false)
