@@ -1055,3 +1055,217 @@ CREATE POLICY "manager_read_owner_subscription" ON public.subscriptions
 ---
 
 ## Bug count: #038 – #132 (95 bugs total)
+
+---
+
+## BUG #133 — HIGH: Topbar right-side controls overflow on mobile when too many items
+
+**Files:** src/pages/owner/Reports.jsx (trigger case); pattern applies to any page passing many items to `topbarRight`
+**Symptom:** On a 375px phone the topbar row overflowed — period-filter buttons, lang toggle, notification bell, and a text-label export button all competed in one row and pushed content off-screen.
+**WRONG:**
+```jsx
+// Same full 7-item desktop topbar rendered unconditionally on mobile:
+<div style={{ display:'flex', gap:6 }}>
+  {PERIODS.map(p => <PeriodButton />)} {/* 4 buttons */}
+  <Divider />
+  <LangToggle />
+  <NotificationBell />
+  <button>↓ تصدير</button>  {/* text label */}
+</div>
+```
+**CORRECT:**
+```jsx
+const topbarRight = isMobile ? (
+  // Mobile: max 3 items, action button is icon-only with aria-label
+  <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+    <LangToggle />
+    <NotificationBell />
+    <button onClick={exportCSV} aria-label={isAr ? 'تصدير CSV' : 'Export CSV'}
+      style={{ minWidth:44, minHeight:44, fontSize:16 }}>↓</button>
+  </div>
+) : (/* full desktop 7-item row */)
+
+// Period selector moved inside page content, mobile-only:
+{isMobile && (
+  <div style={{ display:'flex', gap:6, overflowX:'auto', marginBottom:16 }}>
+    {PERIODS.map(p => <button key={p.key}>...</button>)}
+  </div>
+)}
+```
+**Rule:** Mobile topbar right slot must contain at most 3 items (lang toggle + notification + one action). Text-label action buttons must become icon-only on mobile with `aria-label` and `minWidth/minHeight: 44`. Secondary controls (period selectors, filter rows) must be moved into the page content area. Same icon-only pattern as Branches.jsx / Managers.jsx add buttons.
+
+---
+
+## BUG #134 — HIGH: Sidebar profile/logout area cut off on iOS Safari (100vh vs 100dvh)
+
+**Files:** src/components/OwnerLayout.jsx, src/components/BMLayout.jsx, src/components/AdminLayout.jsx
+**Symptom:** On iOS Safari, the sidebar's logout button and profile row at the bottom were invisible — clipped below the visible screen — even though the sidebar appeared to fill the screen.
+**Root cause:** `height: '100vh'` on iOS Safari equals the total viewport height including the browser address-bar chrome, which is taller than the usable area. Fixed sidebars at `100vh` therefore overflow below the visible region. The bottom section (logout button) was reachable only by scrolling the sidebar itself, which had no scroll affordance.
+**WRONG:**
+```jsx
+const sidebarStyle = { position:'fixed', height:'100vh', ... }
+```
+**CORRECT:**
+```jsx
+// Defined at module level (outside the component — never changes):
+const DVH = window.CSS?.supports('height', '100dvh') ? '100dvh' : '100vh'
+
+// Inside the component:
+const sidebarStyle = { position:'fixed', height: DVH, ... }
+```
+**Rule:** ALWAYS use `const DVH = window.CSS?.supports('height', '100dvh') ? '100dvh' : '100vh'` for any `position:fixed` element that must fill the viewport (sidebars, full-screen overlays). `100dvh` is the dynamic viewport height that excludes browser chrome. Define `DVH` at module scope so it is computed once. The `?? '100vh'` fallback covers browsers that don't support `100dvh` yet.
+
+---
+
+## BUG #135 — HIGH: Mobile form toggle silently broken by state ordering and resize-effect placement
+
+**Files:** src/pages/owner/TaskManagement.jsx (reference), src/pages/owner/Schedule.jsx, src/pages/owner/FoodSafety.jsx
+**Symptom:** Tapping the mobile "Add" button appeared to do nothing, or the form flashed briefly then reverted to the list. After saving, the success message was never visible because the form auto-closed itself. Bugs survived apparent fixes because the pattern has three independent ordering requirements, all of which must hold simultaneously.
+**Root cause:** Any one of three deviations breaks the toggle:
+1. `showMobileForm` declared **before** `isMobile` — React processes initial state in order; if `showMobileForm(false)` initializes before `isMobile` is read from `window.innerWidth`, teardown logic may reference a stale value.
+2. Resize `useEffect` placed **before** data-fetching effects — effect cleanup and re-registration timing conflicts.
+3. `setShowMobileForm(false)` called after save — closes the panel before the user sees the success state.
+
+**WRONG:**
+```jsx
+const [showMobileForm, setShowMobileForm] = useState(false)      // ← wrong: before isMobile
+const [isMobile,       setIsMobile]       = useState(window.innerWidth < 768)
+
+useEffect(() => {                                                  // ← wrong: not last
+  const onResize = () => setIsMobile(window.innerWidth < 768)
+  window.addEventListener('resize', onResize)
+  return () => window.removeEventListener('resize', onResize)
+}, [])
+
+// ... data-fetching useEffects ...
+
+async function handleSave() {
+  await save()
+  if (isMobile) setShowMobileForm(false)                          // ← wrong: auto-closes
+}
+```
+**CORRECT:**
+```jsx
+const [isMobile,       setIsMobile]       = useState(window.innerWidth < 768)  // FIRST
+const [showMobileForm, setShowMobileForm] = useState(false)                     // SECOND
+
+// ... ALL data-fetching useEffects here ...
+
+useEffect(() => {                                                                // LAST
+  const onResize = () => setIsMobile(window.innerWidth < 768)
+  window.addEventListener('resize', onResize)
+  return () => window.removeEventListener('resize', onResize)
+}, [])
+
+async function handleSave() {
+  await save()
+  // ← NO setShowMobileForm(false): user taps ← Back to return to list
+}
+```
+**Rule:** Mobile form toggle checklist — all three required simultaneously: (1) `isMobile` declared first, `showMobileForm` second. (2) Resize `useEffect` placed LAST, after every data-fetching effect. (3) NEVER call `setShowMobileForm(false)` after save — leave the form open with the success message; the user taps "← Back" / "رجوع →" to return. Deviating from any one point breaks the toggle silently.
+
+---
+
+## BUG #136 — HIGH: Schedule.jsx event form overlapped calendar on mobile
+
+**File:** src/pages/owner/Schedule.jsx
+**Symptom:** On mobile, the 272px event-form panel rendered beside the calendar, squishing the calendar to ~103px. Neither panel was usable.
+**Root cause:** Same class as BUG #132. Additionally: the outer container had `padding: '16px 20px'` which caused `width:'100%'` on the form panel to resolve to `375 - 32 = 343px` instead of the full viewport width. State ordering and resize effect were also wrong (BUG #135 pattern).
+**WRONG:**
+```jsx
+<div style={{ display:'flex', padding:'16px 20px', gap:14 }}>
+  <CalendarPanel style={{ flex:1 }} />       {/* always rendered */}
+  <FormPanel style={{ width:272 }} />        {/* always rendered */}
+</div>
+```
+**CORRECT:**
+```jsx
+<div style={{ display:'flex', height:'100%', overflow:'hidden',
+              padding: isMobile ? 0 : '16px 20px',
+              gap:     isMobile ? 0 : 14 }}>
+  {(!isMobile || !showMobileForm) && (
+    <CalendarPanel>
+      {isMobile && (
+        <button onClick={() => setShowMobileForm(true)} style={{ width:'100%', ... }}>
+          + {isAr ? 'إضافة حدث' : 'Add Event'}
+        </button>
+      )}
+    </CalendarPanel>
+  )}
+  {(!isMobile || showMobileForm) && (
+    <FormPanel style={{ width: isMobile ? '100%' : 272,
+                        padding: isMobile ? 16 : 0, boxSizing:'border-box' }}>
+      {isMobile && (
+        <button onClick={() => setShowMobileForm(false)} style={{ minHeight:44, ... }}>
+          {isAr ? 'رجوع →' : '← Back'}
+        </button>
+      )}
+    </FormPanel>
+  )}
+</div>
+```
+**Rule:** Same as BUG #132. Extra: when the outer container has horizontal padding and the form switches to `width:'100%'` on mobile, also zero the container padding on mobile — otherwise `width:'100%'` is `viewport - 2*padding`, not full-screen. Use `padding: isMobile ? 0 : '...'` and `gap: isMobile ? 0 : N` on the container.
+
+---
+
+## BUG #137 — HIGH: FoodSafety.jsx form panel overlapped standards list on mobile
+
+**File:** src/pages/owner/FoodSafety.jsx
+**Symptom:** Same visual bug as BUG #132 — 340px "Add Standard" form panel rendered beside the list, leaving the list as an unusable sliver on mobile.
+**Root cause:** Same class as BUG #132, compounded by all three BUG #135 ordering violations: `showMobileForm` declared before `isMobile`, resize effect not placed last, and `handleSave` called `setShowMobileForm(false)`. Left panel padding was also not mobile-conditional.
+**WRONG:**
+```jsx
+const [showMobileForm, setShowMobileForm] = useState(false)   // wrong order
+const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
+// resize useEffect placed first (not last)
+
+async function handleSave() {
+  await save()
+  if (isMobile) setShowMobileForm(false)  // auto-closes before success shown
+}
+
+// Left panel: padding:'20px 20px 20px 24px' always (not mobile-conditional)
+```
+**CORRECT:** Apply BUG #135 ordering rules. Left panel: `padding: isMobile ? '16px' : '20px 20px 20px 24px'`. Right panel: `width: isMobile ? '100%' : 340`, `borderLeft: isMobile ? 'none' : '1px solid #E5E7EB'`, `padding: isMobile ? 16 : 24`. Back button: `{isAr ? 'رجوع →' : '← Back'}`, `minHeight:44`.
+**Rule:** Any page with a list+form split layout must pass all three checks from BUG #135 before being considered fixed. A fix that passes on desktop but skips the state-ordering or auto-close checks will still be broken on a real phone.
+
+---
+
+## BUG #138 — HIGH: Reports.jsx had four simultaneous mobile layout failures
+
+**File:** src/pages/owner/Reports.jsx
+**Symptom (4 issues on a 375px phone):**
+1. Topbar overflowed — 7 controls in one row (see BUG #133)
+2. KPI stat cards clipped on left edge — `padding:'20px 24px'` + 2-column grid left insufficient card width
+3. Bar chart forced horizontal scroll even with ≤7 bars — `minWidth: Math.max(600, n*40)` hard-floored the chart at 600px on a 343px card
+4. Chart row and bottom row remained side-by-side — grids not responsive
+
+**WRONG:**
+```jsx
+<div style={{ padding:'20px 24px' }}>  {/* too wide on mobile */}
+  <KPIGrid style={{ gridTemplateColumns:'repeat(4,1fr)' }} /> {/* 4 cols always */}
+  <Row2 style={{ gridTemplateColumns:'1.6fr 1fr' }} />         {/* side-by-side always */}
+  <Row3 style={{ gridTemplateColumns:'1fr 1fr'   }} />         {/* side-by-side always */}
+  <div style={{ minWidth: Math.max(600, n*40) + 'px' }}>       {/* 600px floor always */}
+    <BarChart H={120} minBarWidth={32} />
+  </div>
+</div>
+```
+**CORRECT:**
+```jsx
+<div style={{ padding: isMobile ? '16px' : '20px 24px' }}>
+  <KPIGrid style={{ gridTemplateColumns: isMobile ? 'repeat(2,1fr)' : 'repeat(4,1fr)' }}
+           cardPadding={isMobile ? 12 : 16} />
+  <Row2 style={{ gridTemplateColumns: isMobile ? '1fr' : '1.6fr 1fr' }} />
+  <Row3 style={{ gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr'   }} />
+  <div style={{ minWidth: isMobile ? undefined : Math.max(600, n*40) + 'px' }}>
+    <BarChart H={isMobile ? 80 : 120} minBarWidth={isMobile ? 28 : 32}
+              labelFontSize={isMobile ? 9 : 8} />
+  </div>
+</div>
+```
+**Rule:** Report pages with charts must: (1) switch topbar to icon-only simplified layout on mobile (BUG #133), (2) reduce page-level side padding to `16px` on mobile so cards have room to breathe, (3) remove the `minWidth` floor on chart containers on mobile — flex bars fill the card naturally, (4) collapse every multi-column grid to `1fr` on mobile. BarChart height should be `80px` on mobile (not `120px`) so it doesn't dominate the screen.
+
+---
+
+## Bug count: #038 – #138 (101 bugs total)

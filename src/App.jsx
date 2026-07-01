@@ -11,6 +11,7 @@ const OwnerLogin            = lazy(() => import('./pages/owner/Login'))
 const OwnerRegister         = lazy(() => import('./pages/owner/Register'))
 const OwnerForgotPassword   = lazy(() => import('./pages/owner/ForgotPassword'))
 const OwnerResetPassword    = lazy(() => import('./pages/owner/ResetPassword'))
+const OwnerEmailVerify      = lazy(() => import('./pages/owner/EmailVerify'))
 const OwnerDashboard        = lazy(() => import('./pages/owner/Dashboard'))
 const OwnerBranches         = lazy(() => import('./pages/owner/Branches'))
 const OwnerManagers         = lazy(() => import('./pages/owner/Managers'))
@@ -77,6 +78,7 @@ export default function App() {
         <Suspense fallback={<PageLoader />}>
         <Routes>
           <Route path="/" element={<Landing />} />
+          <Route path="/verify" element={<OwnerEmailVerify />} />
 
           <Route path="/owner" element={<OwnerLayout />}>
             <Route path="login" element={<OwnerLogin />} />

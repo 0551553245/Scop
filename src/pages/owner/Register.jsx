@@ -146,6 +146,7 @@ export default function OwnerRegister() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [showPass, setShowPass] = useState(false)
+  const [emailSent, setEmailSent] = useState('')
 
   useEffect(() => {
     getPlatformSettings(supabaseOwner).then(settings => {
@@ -224,6 +225,23 @@ export default function OwnerRegister() {
         throw authErr
       }
       if (!authData?.user) throw new Error('No user returned')
+
+      // Email confirmation required — session is null, user must verify before signing in
+      if (!authData.session) {
+        localStorage.setItem('scop-pending-registration', JSON.stringify({
+          userId:           authData.user.id,
+          email:            form.email,
+          ownerName:        form.ownerName,
+          nameAr:           form.nameAr || null,
+          phone:            form.phone,
+          restaurantName:   form.restaurantName,
+          restaurantNameAr: form.restaurantNameAr || form.restaurantName,
+          city:             form.city,
+          plan:             selectedPlan,
+        }))
+        setEmailSent(form.email)
+        return
+      }
 
       const userId = authData.user.id
 
@@ -329,6 +347,54 @@ export default function OwnerRegister() {
     fontSize: 11, fontWeight: 500, color: '#1B4332',
     cursor: 'pointer', fontFamily: 'inherit',
   }
+
+  // ── EMAIL CONFIRMATION PENDING ────────────────────────────────
+  if (emailSent) return (
+    <div dir={isAr ? 'rtl' : 'ltr'}
+      style={{ display: 'flex', minHeight: '100vh', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#F0FDF4', fontFamily: isAr ? "'Cairo', sans-serif" : "'Inter', sans-serif", padding: '40px 20px' }}>
+      <div style={{ background: '#fff', border: '0.5px solid #E5E7EB', borderRadius: 16, padding: '48px 40px', maxWidth: 440, width: '100%', textAlign: 'center' }}>
+        <div style={{ width: 56, height: 56, borderRadius: '50%', background: '#F0FDF4', border: '2px solid #BBF7D0', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" stroke="#1B4332" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M22 6l-10 7L2 6" stroke="#1B4332" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </div>
+        <h2 style={{ fontSize: 22, fontWeight: 600, color: '#111827', margin: '0 0 8px' }}>
+          {isAr ? 'تحقق من بريدك الإلكتروني' : 'Check your email'}
+        </h2>
+        <p style={{ fontSize: 13, color: '#6B7280', margin: '0 0 16px', lineHeight: 1.6 }}>
+          {isAr
+            ? `أرسلنا رابط التحقق إلى`
+            : `We sent a verification link to`}
+        </p>
+        <div style={{ fontSize: 14, fontWeight: 600, color: '#1B4332', marginBottom: 24, direction: 'ltr' }}>
+          {emailSent}
+        </div>
+        <div style={{ background: '#F0FDF4', border: '0.5px solid #BBF7D0', borderRadius: 12, padding: '14px 16px', marginBottom: 24, textAlign: isAr ? 'right' : 'left' }}>
+          {(isAr ? [
+            'افتح بريدك الإلكتروني وانقر على رابط التحقق',
+            'سيتم تفعيل حسابك تلقائياً',
+            'بعد التحقق يمكنك تسجيل الدخول مباشرةً',
+          ] : [
+            'Open your email and click the verification link',
+            'Your account will be activated automatically',
+            'After verification you can sign in to your dashboard',
+          ]).map(item => (
+            <div key={item} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 6, fontSize: 12, color: '#374151' }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0, marginTop: 1 }}>
+                <path d="M5 13l4 4L19 7" stroke="#1B4332" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              {item}
+            </div>
+          ))}
+        </div>
+        <Link to="/owner/login" style={{ display: 'block', width: '100%', padding: '12px 20px', background: '#1B4332', color: '#fff', border: 'none', borderRadius: 10, fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', textDecoration: 'none', boxSizing: 'border-box' }}>
+          {isAr ? 'تسجيل الدخول →' : 'Go to sign in →'}
+        </Link>
+      </div>
+      <PageStyles />
+    </div>
+  )
 
   // ── STEP 1 ─────────────────────────────────────────────────────
   if (step === 1) return (
