@@ -224,12 +224,11 @@ export default function OwnerRegister() {
         }
         throw authErr
       }
-      if (!authData?.user) throw new Error('No user returned')
-
-      // Email confirmation required — session is null, user must verify before signing in
-      if (!authData.session) {
+      // Check for email confirmation FIRST — with PKCE flow Supabase returns
+      // { user: null, session: null } when confirmation is required, so the
+      // user-null guard below must not run before we detect this case.
+      if (!authData?.session) {
         localStorage.setItem('scop-pending-registration', JSON.stringify({
-          userId:           authData.user.id,
           email:            form.email,
           ownerName:        form.ownerName,
           nameAr:           form.nameAr || null,
@@ -242,6 +241,8 @@ export default function OwnerRegister() {
         setEmailSent(form.email)
         return
       }
+
+      if (!authData?.user) throw new Error('No user returned')
 
       const userId = authData.user.id
 
