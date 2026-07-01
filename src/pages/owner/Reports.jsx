@@ -96,9 +96,16 @@ export default function OwnerReports() {
 
   const [period,      setPeriod]      = useState('week')
   const [chartOffset, setChartOffset] = useState(0)
+  const [isMobile,    setIsMobile]    = useState(window.innerWidth < 768)
 
   // reset chart window whenever period changes
   useEffect(() => { setChartOffset(0) }, [period])
+
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 768)
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
 
   // ── FETCH ─────────────────────────────────────────────────
   const fetchData = useCallback(async () => {
@@ -347,7 +354,17 @@ export default function OwnerReports() {
     URL.revokeObjectURL(url)
   }
 
-  const reportsTopbarRight = (
+  const reportsTopbarRight = isMobile ? (
+    <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+      <button onClick={toggleLang} style={{ fontSize:12, color:'#6B7280', background:'#F9FAFB', border:'1px solid #E5E7EB', padding:'4px 11px', borderRadius:20, cursor:'pointer', fontFamily:'inherit' }}>
+        {isAr ? 'EN' : 'ع'}
+      </button>
+      <NotificationBell isAr={isAr} />
+      <button onClick={exportCSV} style={{ fontSize:11, fontWeight:600, color:'#1B4332', background:'#F0FDF4', border:'1px solid #BBF7D0', padding:'4px 10px', borderRadius:20, cursor:'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', gap:4 }}>
+        ↓ {isAr ? 'تصدير' : 'CSV'}
+      </button>
+    </div>
+  ) : (
     <div style={{ display:'flex', alignItems:'center', gap:6 }}>
       {PERIODS.map(p => (
         <button key={p.key} onClick={() => setPeriod(p.key)} style={{ padding:'4px 11px', borderRadius:20, fontSize:11, fontWeight:600, cursor:'pointer', fontFamily:'inherit', transition:'all 0.15s', border: period===p.key ? 'none' : '1px solid #E5E7EB', background: period===p.key ? '#1B4332' : '#fff', color: period===p.key ? '#fff' : '#6B7280' }}>
@@ -369,14 +386,14 @@ export default function OwnerReports() {
   if (loading) return (
     <OwnerLayout activePath="/owner/reports" title="Reports" titleAr="التقارير" branches={branches}>
       <div style={{ padding: '24px' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 20 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2,1fr)' : 'repeat(4,1fr)', gap: 12, marginBottom: 20 }}>
           {[0,1,2,3].map(k => <div key={k} className="skeleton" style={{ height: 100 }} />)}
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: 16, marginBottom: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1.6fr 1fr', gap: 16, marginBottom: 16 }}>
           <div className="skeleton" style={{ height: 220 }} />
           <div className="skeleton" style={{ height: 220 }} />
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 16 }}>
           <div className="skeleton" style={{ height: 200 }} />
           <div className="skeleton" style={{ height: 200 }} />
         </div>
@@ -420,8 +437,19 @@ export default function OwnerReports() {
             </div>
           ) : (
             <>
+              {/* Period selector — mobile only (desktop is in topbar) */}
+              {isMobile && (
+                <div style={{ display:'flex', gap:6, overflowX:'auto', marginBottom:16, paddingBottom:2 }}>
+                  {PERIODS.map(p => (
+                    <button key={p.key} onClick={() => setPeriod(p.key)} style={{ flexShrink:0, padding:'6px 14px', borderRadius:20, fontSize:12, fontWeight:600, cursor:'pointer', fontFamily:'inherit', transition:'all 0.15s', border: period===p.key ? 'none' : '1px solid #E5E7EB', background: period===p.key ? '#1B4332' : '#fff', color: period===p.key ? '#fff' : '#6B7280' }}>
+                      {isAr ? p.ar : p.en}
+                    </button>
+                  ))}
+                </div>
+              )}
+
               {/* ── 4 KPI CARDS ── */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 16 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2,1fr)' : 'repeat(4,1fr)', gap: 12, marginBottom: 16 }}>
                 {[
                   {
                     icon: '✓',  iconBg: '#F0FDF4',
@@ -466,7 +494,7 @@ export default function OwnerReports() {
               </div>
 
               {/* ── ROW 2: BAR CHART + BRANCH PERFORMANCE ── */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: 14, marginBottom: 14 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1.6fr 1fr', gap: 14, marginBottom: 14 }}>
 
                 {/* Daily completion bar chart */}
                 <div style={{ background: '#fff', border: '1px solid #E8E4DC', borderRadius: 16, padding: 20 }}>
@@ -577,7 +605,7 @@ export default function OwnerReports() {
               </div>
 
               {/* ── ROW 3: TOP MISSED + FOOD SAFETY BREAKDOWN ── */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 14 }}>
 
                 {/* Top missed tasks */}
                 <div style={{ background: '#fff', border: '1px solid #E8E4DC', borderRadius: 16, padding: 20 }}>

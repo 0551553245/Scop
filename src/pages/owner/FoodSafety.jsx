@@ -55,6 +55,9 @@ export default function OwnerFoodSafety() {
   const [saveOk,    setSaveOk]    = useState('')
   const [saveErr,   setSaveErr]   = useState('')
 
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
+  const [showMobileForm, setShowMobileForm] = useState(false)
+
   const fetchData = useCallback(async () => {
     if (!profile) return
     setError('')
@@ -103,6 +106,12 @@ export default function OwnerFoodSafety() {
       .subscribe()
     return () => supabaseOwner.removeChannel(ch)
   }, [profile?.id, fetchData])
+
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 768)
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
 
   function pickTemplate(idx) {
     const tpl = TEMPLATES[idx]
@@ -188,6 +197,14 @@ export default function OwnerFoodSafety() {
     return isAr ? b?.name_ar || b?.name : b?.name || '—'
   }
 
+  const emptyHintAr = isMobile
+    ? 'اضغط على زر "إضافة معيار" أعلاه للبدء'
+    : 'أضف معايير سلامة الغذاء باستخدام اللوحة على اليمين'
+
+  const emptyHintEn = isMobile
+    ? 'Tap "+ Add Standard" above to get started'
+    : 'Add food safety standards using the panel on the right'
+
   const fsTopbarLeft = (
     <div style={{ display:'flex', alignItems:'center', gap:8 }}>
       <span style={{ fontSize:15, fontWeight:700, color:'#111827' }}>{isAr ? 'سلامة الغذاء' : 'Food Safety'}</span>
@@ -219,14 +236,23 @@ export default function OwnerFoodSafety() {
       <div style={{ height:'100%', display:'flex', overflow:'hidden' }}>
 
           {/* LEFT — standards list */}
-          <div style={{ flex:1, overflowY:'auto', padding:'20px 20px 20px 24px' }}>
+          {(!isMobile || !showMobileForm) && (
+          <div style={{ flex:1, overflowY:'auto', padding: isMobile ? '16px' : '20px 20px 20px 24px' }}>
+            {isMobile && (
+              <button
+                onClick={() => setShowMobileForm(true)}
+                style={{ width:'100%', marginBottom:16, padding:'12px', background:'#1B4332', color:'#fff', border:'none', borderRadius:12, fontSize:14, fontWeight:700, cursor:'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}
+              >
+                + {isAr ? 'إضافة معيار' : 'Add Standard'}
+              </button>
+            )}
             {error && <div style={{ background:'#FFF1F2', border:'1px solid #FECDD3', borderRadius:12, padding:'12px 16px', marginBottom:16, color:'#9F1239', fontSize:13, display:'flex', alignItems:'center', justifyContent:'space-between', gap:12 }}><span>{error}</span><button onClick={fetchData} style={{ background:'none', border:'1px solid #FECDD3', borderRadius:8, padding:'4px 10px', color:'#9F1239', fontSize:12, cursor:'pointer', flexShrink:0 }}>{isAr?'إعادة المحاولة':'Retry'}</button></div>}
 
             {standards.length === 0 ? (
               <div style={{ background:'#fff', border:'1px solid #E5E7EB', borderRadius:18, padding:40, textAlign:'center', marginTop:20 }}>
                 <div style={{ fontSize:40, marginBottom:12 }}>🛡</div>
                 <div style={{ fontSize:15, fontWeight:700, color:'#111827', marginBottom:6 }}>{isAr?'لا توجد معايير بعد':'No standards yet'}</div>
-                <div style={{ fontSize:13, color:'#6B7280' }}>{isAr?'أضف معايير سلامة الغذاء من اللوحة على اليمين':'Add food safety standards using the panel on the right'}</div>
+                <div style={{ fontSize:13, color:'#6B7280' }}>{isAr ? emptyHintAr : emptyHintEn}</div>
               </div>
             ) : (
               <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
@@ -303,9 +329,19 @@ export default function OwnerFoodSafety() {
               </div>
             )}
           </div>
+          )}
 
           {/* RIGHT — create standard panel */}
-          <div style={{ width:340, background:'#fff', borderLeft:'1px solid #E5E7EB', overflowY:'auto', padding:24, flexShrink:0 }}>
+          {(!isMobile || showMobileForm) && (
+          <div style={{ width: isMobile ? '100%' : 340, background:'#fff', borderLeft: isMobile ? 'none' : '1px solid #E5E7EB', overflowY:'auto', padding: isMobile ? 16 : 24, flexShrink:0 }}>
+            {isMobile && (
+              <button
+                onClick={() => setShowMobileForm(false)}
+                style={{ display:'flex', alignItems:'center', gap:6, background:'none', border:'none', cursor:'pointer', fontSize:14, fontWeight:600, color:'#374151', fontFamily:'inherit', padding:'4px 0', marginBottom:16, minHeight:44 }}
+              >
+                {isAr ? 'رجوع →' : '← Back'}
+              </button>
+            )}
             <div style={{ fontSize:15, fontWeight:700, color:'#111827', marginBottom:4 }}>{isAr?'معيار جديد':'New Standard'}</div>
             <div style={{ fontSize:11, color:'#9CA3AF', marginBottom:20 }}>{isAr?'اختر قالباً أو أدخل يدوياً':'Pick a template or enter manually'}</div>
 
@@ -443,6 +479,7 @@ export default function OwnerFoodSafety() {
               </SubscriptionGuard>
             </form>
           </div>
+          )}
         </div>
 
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>

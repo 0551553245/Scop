@@ -85,6 +85,9 @@ export default function OwnerSchedule() {
     return () => clearInterval(id)
   }, [])
 
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
+  const [showMobileForm, setShowMobileForm] = useState(false)
+
   const [form, setForm] = useState({
     title: '', title_ar: '', description: '',
     event_date: todayISO(),
@@ -134,6 +137,12 @@ export default function OwnerSchedule() {
       .subscribe()
     return () => supabaseOwner.removeChannel(ch)
   }, [profile?.id, fetchData])
+
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 768)
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
 
   // ── CREATE ────────────────────────────────────────────────────
   async function handleCreate(e) {
@@ -230,10 +239,11 @@ export default function OwnerSchedule() {
         )}
 
       {/* Content: calendar + form */}
-      <div style={{ height: '100%', overflow: 'hidden', padding: '16px 20px', display: 'flex', gap: 14, minHeight: 0 }}>
+      <div style={{ height: '100%', overflow: 'hidden', padding: isMobile ? 0 : '16px 20px', display: 'flex', gap: isMobile ? 0 : 14, minHeight: 0 }}>
 
           {/* ─── CALENDAR SECTION ─────────────────────────────── */}
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#fff', border: '1px solid #E5E7EB', borderRadius: 16, minHeight: 0 }}>
+          {(!isMobile || !showMobileForm) && (
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#fff', border: isMobile ? 'none' : '1px solid #E5E7EB', borderRadius: isMobile ? 0 : 16, minHeight: 0 }}>
 
             {/* Week navigation */}
             <div style={{ padding: '12px 16px', borderBottom: '1px solid #E5E7EB', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
@@ -251,6 +261,16 @@ export default function OwnerSchedule() {
                 style={{ width: 30, height: 30, border: '1px solid #E5E7EB', borderRadius: 8, background: '#fff', cursor: 'pointer', fontSize: 16, color: '#6B7280', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
               >›</button>
             </div>
+
+            {/* Mobile: Create Event button between nav and day headers */}
+            {isMobile && (
+              <button
+                onClick={() => setShowMobileForm(true)}
+                style={{ margin: '0 16px 12px', padding: '12px', background: '#1B4332', color: '#fff', border: 'none', borderRadius: 12, fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+              >
+                + {isAr ? 'إضافة حدث' : 'Create Event'}
+              </button>
+            )}
 
             {/* Day headers (always LTR — time flows left→right) */}
             <div dir="ltr" style={{ display: 'grid', gridTemplateColumns: '52px repeat(7, 1fr)', borderBottom: '1px solid #E5E7EB', flexShrink: 0 }}>
@@ -394,9 +414,21 @@ export default function OwnerSchedule() {
               </div>
             </div>
           </div>
+          )}
 
           {/* ─── FORM PANEL ───────────────────────────────────── */}
-          <div style={{ width: 272, flexShrink: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12, minHeight: 0 }}>
+          {(!isMobile || showMobileForm) && (
+          <div style={{ width: isMobile ? '100%' : 272, flexShrink: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12, minHeight: 0, padding: isMobile ? '16px' : 0, boxSizing: 'border-box' }}>
+
+            {/* Mobile: Back button */}
+            {isMobile && (
+              <button
+                onClick={() => setShowMobileForm(false)}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, fontWeight: 600, color: '#374151', fontFamily: 'inherit', padding: '4px 0', marginBottom: 4, minHeight: 44 }}
+              >
+                {isAr ? 'رجوع →' : '← Back'}
+              </button>
+            )}
 
             {/* Create event card */}
             <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 16, padding: 18 }}>
@@ -525,6 +557,7 @@ export default function OwnerSchedule() {
               </div>
             </div>
           </div>
+          )}
         </div>
 
       <style>{`
