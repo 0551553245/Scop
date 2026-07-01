@@ -91,30 +91,52 @@ export default function EmailVerify() {
       }
     }
 
-    // In case supabaseOwner already processed the URL tokens synchronously
-    supabaseOwner.auth.getSession().then(({ data: { session } }) => {
-      if (session) completeSetup(session)
-    })
+    async function tryVerify() {
+      // 1. Parse token_hash and type from the URL (PKCE flow appends these as query params)
+      const params     = new URLSearchParams(window.location.search)
+      const tokenHash  = params.get('token_hash')
+      const type       = params.get('type')   // 'signup' | 'email' | 'recovery' etc.
 
-    // Listen for the SIGNED_IN event fired when URL tokens are exchanged
-    const { data: { subscription } } = supabaseOwner.auth.onAuthStateChange((event, session) => {
-      if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session) {
-        completeSetup(session)
+      if (tokenHash) {
+        const { data, error } = await supabaseOwner.auth.verifyOtp({
+          token_hash: tokenHash,
+          type:       type === 'signup' ? 'signup' : 'email',
+        })
+        if (error) {
+          if (!settled) { settled = true; setStatus('expired') }
+          return
+        }
+        if (data?.session) { completeSetup(data.session); return }
       }
-    })
 
-    // Fallback timeout — if no SIGNED_IN after 12 s, the link is invalid/expired
-    const timer = setTimeout(() => {
-      if (!settled) {
-        settled = true
-        setStatus('expired')
+      // 2. Fallback: check if supabaseOwner already has a session
+      //    (handles implicit-flow hash tokens the client auto-processes)
+      const { data: { session } } = await supabaseOwner.auth.getSession()
+      if (session) { completeSetup(session); return }
+
+      // 3. Listen for SIGNED_IN fired by the client when it processes URL tokens
+      const { data: { subscription } } = supabaseOwner.auth.onAuthStateChange((event, sess) => {
+        if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && sess) {
+          completeSetup(sess)
+        }
+      })
+
+      // 4. Give up after 12 s if nothing fires
+      const timer = setTimeout(() => {
+        if (!settled) { settled = true; setStatus('expired') }
+      }, 12000)
+
+      return () => {
+        subscription.unsubscribe()
+        clearTimeout(timer)
       }
-    }, 12000)
-
-    return () => {
-      subscription.unsubscribe()
-      clearTimeout(timer)
     }
+
+    // tryVerify is async; capture its cleanup return value
+    let cleanup = () => {}
+    tryVerify().then(fn => { if (fn) cleanup = fn })
+
+    return () => cleanup()
   }, [])
 
   const fontFamily = isAr ? "'Cairo', sans-serif" : "'Inter', sans-serif"
