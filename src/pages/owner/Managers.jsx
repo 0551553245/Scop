@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
+import { useIsMobile } from '../../hooks/useIsMobile'
 import { Link } from 'react-router-dom'
 import { supabaseOwner, supabaseTemp } from '../../lib/supabase'
 import { useOwnerAuth } from '../../context/OwnerAuthContext'
@@ -52,12 +53,7 @@ export default function OwnerManagers() {
   const [modalSaving,  setModalSaving]  = useState(false)
   const [modalSuccess, setModalSuccess] = useState('')
 
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
-  useEffect(() => {
-    const onResize = () => setIsMobile(window.innerWidth < 768)
-    window.addEventListener('resize', onResize)
-    return () => window.removeEventListener('resize', onResize)
-  }, [])
+  const isMobile = useIsMobile()
 
   // ── FETCH ─────────────────────────────────────────────────
   const fetchData = useCallback(async () => {

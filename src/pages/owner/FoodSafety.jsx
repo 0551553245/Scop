@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
+import { useIsMobile } from '../../hooks/useIsMobile'
 import { supabaseOwner } from '../../lib/supabase'
 import { useOwnerAuth } from '../../context/OwnerAuthContext'
 import { useLanguage } from '../../context/LanguageContext'
@@ -55,7 +56,7 @@ export default function OwnerFoodSafety() {
   const [saveOk,    setSaveOk]    = useState('')
   const [saveErr,   setSaveErr]   = useState('')
 
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
+  const isMobile = useIsMobile()
   const [showMobileForm, setShowMobileForm] = useState(false)
 
   const fetchData = useCallback(async () => {
@@ -106,12 +107,6 @@ export default function OwnerFoodSafety() {
       .subscribe()
     return () => supabaseOwner.removeChannel(ch)
   }, [profile?.id, fetchData])
-
-  useEffect(() => {
-    const onResize = () => setIsMobile(window.innerWidth < 768)
-    window.addEventListener('resize', onResize)
-    return () => window.removeEventListener('resize', onResize)
-  }, [])
 
   function pickTemplate(idx) {
     const tpl = TEMPLATES[idx]

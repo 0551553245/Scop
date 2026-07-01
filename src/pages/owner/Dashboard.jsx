@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
+import { useIsMobile } from '../../hooks/useIsMobile'
 import { Link } from 'react-router-dom'
 import { supabaseOwner } from '../../lib/supabase'
 import { useOwnerAuth } from '../../context/OwnerAuthContext'
@@ -66,14 +67,8 @@ export default function OwnerDashboard() {
   const [whatsappNumber, setWhatsappNumber] = useState(DEFAULT_SETTINGS.support_whatsapp)
   const [loading,        setLoading]        = useState(true)
   const [error,          setError]          = useState('')
-  const [isMobile,       setIsMobile]       = useState(window.innerWidth < 768)
+  const isMobile = useIsMobile()
   const loadTimerRef = useRef(null)
-
-  useEffect(() => {
-    const handler = () => setIsMobile(window.innerWidth < 768)
-    window.addEventListener('resize', handler)
-    return () => window.removeEventListener('resize', handler)
-  }, [])
 
   const fetchDashboard = useCallback(async () => {
     if (!profile) return

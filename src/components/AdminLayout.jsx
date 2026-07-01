@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
+import { useIsMobile } from '../hooks/useIsMobile'
 import { Link } from 'react-router-dom'
 
 const DVH = window.CSS?.supports('height', '100dvh') ? '100dvh' : '100vh'
@@ -87,13 +88,7 @@ export function AdminSidebar({ currentPath, profile, isAr, handleSignOut, isMobi
 
 export default function AdminLayout({ currentPath, profile, isAr, handleSignOut, title, titleAr, topbarRight, children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
-
-  useEffect(() => {
-    const handler = () => setIsMobile(window.innerWidth < 768)
-    window.addEventListener('resize', handler)
-    return () => window.removeEventListener('resize', handler)
-  }, [])
+  const isMobile = useIsMobile()
 
   return (
     <div dir={isAr ? 'rtl' : 'ltr'} style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: '#F0FDF4', fontFamily: isAr ? "'Cairo','Segoe UI',sans-serif" : "'Inter','Segoe UI',sans-serif" }}>

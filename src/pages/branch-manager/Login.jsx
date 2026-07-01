@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
+import { useIsMobile } from '../../hooks/useIsMobile'
 import { useNavigate, Link } from 'react-router-dom'
 import { supabaseBranchManager } from '../../lib/supabase'
 import { useLanguage } from '../../context/LanguageContext'
@@ -11,13 +12,7 @@ export default function BranchManagerLogin() {
   const [showPass, setShowPass] = useState(false)
   const [loading, setLoading]   = useState(false)
   const [error, setError]       = useState('')
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
-
-  useEffect(() => {
-    const handler = () => setIsMobile(window.innerWidth < 768)
-    window.addEventListener('resize', handler)
-    return () => window.removeEventListener('resize', handler)
-  }, [])
+  const isMobile = useIsMobile()
 
   const t = {
     en: {

@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
+import { useIsMobile } from '../../hooks/useIsMobile'
 import { Link } from 'react-router-dom'
 import { supabaseOwner } from '../../lib/supabase'
 import { useOwnerAuth } from '../../context/OwnerAuthContext'
@@ -96,16 +97,10 @@ export default function OwnerReports() {
 
   const [period,      setPeriod]      = useState('week')
   const [chartOffset, setChartOffset] = useState(0)
-  const [isMobile,    setIsMobile]    = useState(window.innerWidth < 768)
+  const isMobile = useIsMobile()
 
   // reset chart window whenever period changes
   useEffect(() => { setChartOffset(0) }, [period])
-
-  useEffect(() => {
-    const onResize = () => setIsMobile(window.innerWidth < 768)
-    window.addEventListener('resize', onResize)
-    return () => window.removeEventListener('resize', onResize)
-  }, [])
 
   // ── FETCH ─────────────────────────────────────────────────
   const fetchData = useCallback(async () => {

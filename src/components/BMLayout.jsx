@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
+import { useIsMobile } from '../hooks/useIsMobile'
 import { useNavigate, Link } from 'react-router-dom'
 import { useBranchManagerAuth } from '../context/BranchManagerAuthContext'
 import { useLanguage } from '../context/LanguageContext'
@@ -21,13 +22,7 @@ export default function BMLayout({ activePath, title, titleAr, subtitle, branchN
   const { isAr, toggleLang } = useLanguage()
 
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
-
-  useEffect(() => {
-    const handler = () => setIsMobile(window.innerWidth < 768)
-    window.addEventListener('resize', handler)
-    return () => window.removeEventListener('resize', handler)
-  }, [])
+  const isMobile = useIsMobile()
 
   const name     = isAr ? profile?.name_ar || profile?.name : profile?.name || '—'
   const initials = (profile?.name || 'M').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()

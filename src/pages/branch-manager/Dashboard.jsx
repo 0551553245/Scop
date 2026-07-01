@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
+import { useIsMobile } from '../../hooks/useIsMobile'
 import { useNavigate } from 'react-router-dom'
 import { supabaseBranchManager } from '../../lib/supabase'
 import { useBranchManagerAuth } from '../../context/BranchManagerAuthContext'
@@ -18,13 +19,7 @@ export default function BranchManagerDashboard() {
   const [nextEvent, setNextEvent] = useState(null)
   const [loading,   setLoading]   = useState(true)
   const [error,     setError]     = useState('')
-  const [isMobile,  setIsMobile]  = useState(window.innerWidth < 768)
-
-  useEffect(() => {
-    const handler = () => setIsMobile(window.innerWidth < 768)
-    window.addEventListener('resize', handler)
-    return () => window.removeEventListener('resize', handler)
-  }, [])
+  const isMobile = useIsMobile()
 
   const fetchDashboard = useCallback(async () => {
     if (!profile?.branch_id) return

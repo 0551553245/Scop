@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useMemo, Fragment } from 'react'
+import { useIsMobile } from '../../hooks/useIsMobile'
 import { supabaseOwner } from '../../lib/supabase'
 import { useOwnerAuth } from '../../context/OwnerAuthContext'
 import { getCached, setCached, invalidateCache } from '../../lib/cache'
@@ -49,7 +50,7 @@ export default function OwnerTaskManagement() {
   const [lightboxUrl,   setLightboxUrl]   = useState(null)
   const [expandedPhotos,setExpandedPhotos]= useState({})
 
-  const [isMobile,       setIsMobile]       = useState(window.innerWidth < 768)
+  const isMobile = useIsMobile()
   const [showMobileForm, setShowMobileForm] = useState(false)
 
   // ── CREATE FORM ───────────────────────────────────────────
@@ -161,12 +162,6 @@ export default function OwnerTaskManagement() {
       .subscribe()
     return () => supabaseOwner.removeChannel(ch)
   }, [profile?.id, fetchData])
-
-  useEffect(() => {
-    const onResize = () => setIsMobile(window.innerWidth < 768)
-    window.addEventListener('resize', onResize)
-    return () => window.removeEventListener('resize', onResize)
-  }, [])
 
   // ── PICK TEMPLATE ─────────────────────────────────────────
   function pickTemplate(idx) {

@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
+import { useIsMobile } from '../../hooks/useIsMobile'
 import { supabaseOwner } from '../../lib/supabase'
 import { useOwnerAuth } from '../../context/OwnerAuthContext'
 import { useSubscription } from '../../hooks/useSubscription'
@@ -85,7 +86,7 @@ export default function OwnerSchedule() {
     return () => clearInterval(id)
   }, [])
 
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
+  const isMobile = useIsMobile()
   const [showMobileForm, setShowMobileForm] = useState(false)
 
   const [form, setForm] = useState({
@@ -137,12 +138,6 @@ export default function OwnerSchedule() {
       .subscribe()
     return () => supabaseOwner.removeChannel(ch)
   }, [profile?.id, fetchData])
-
-  useEffect(() => {
-    const onResize = () => setIsMobile(window.innerWidth < 768)
-    window.addEventListener('resize', onResize)
-    return () => window.removeEventListener('resize', onResize)
-  }, [])
 
   // ── CREATE ────────────────────────────────────────────────────
   async function handleCreate(e) {
