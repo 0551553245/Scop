@@ -43,6 +43,7 @@ export default function OwnerLogin() {
       errRole:     'This account is not an owner account.',
       errInactive: 'Your account is inactive. Contact support.',
       errGeneric:  'Something went wrong. Please try again.',
+      errUnverified: 'Please verify your email before signing in. Check your inbox for the confirmation link.',
       stats: [
         { num: '500+', label: 'Restaurants' },
         { num: '98%',  label: 'Satisfaction' },
@@ -72,6 +73,7 @@ export default function OwnerLogin() {
       errRole:     'هذا الحساب ليس حساب مالك.',
       errInactive: 'حسابك غير نشط. تواصل مع الدعم.',
       errGeneric:  'حدث خطأ ما. يرجى المحاولة مجدداً.',
+      errUnverified: 'يرجى التحقق من بريدك الإلكتروني قبل تسجيل الدخول. تحقق من صندوق الوارد للحصول على رابط التأكيد.',
       stats: [
         { num: '+500', label: 'مطعم' },
         { num: '98%',  label: 'رضا العملاء' },
@@ -100,6 +102,13 @@ export default function OwnerLogin() {
 
       if (authError) {
         setError(t.errInvalid)
+        setLoading(false)
+        return
+      }
+
+      if (!authData.user.email_confirmed_at) {
+        await supabaseOwner.auth.signOut()
+        setError(t.errUnverified)
         setLoading(false)
         return
       }

@@ -1268,4 +1268,113 @@ async function handleSave() {
 
 ---
 
-## Bug count: #038 – #138 (101 bugs total)
+---
+
+## BUG #139 — CRITICAL: Owner registration showed "Account creation failed" instead of "check your email" card on PKCE flow
+
+**File:** src/pages/owner/Register.jsx
+**Symptom:** After clicking "Create Account", the form showed a red "Account creation failed" error instead of a "Check your email" confirmation card, even though Supabase had sent the verification email successfully.
+**Root cause:** Supabase PKCE flow (v2 default with email confirmation enabled) returns `{ user: null, session: null, error: null }` from `signUp` — the user object is deliberately withheld until the email is verified. The guard `if (!authData?.user) throw new Error('No user returned')` ran BEFORE the `if (!authData?.session)` check, so it threw before the email-sent state was ever set.
+**WRONG:**
+```jsx
+// PKCE returns user:null — this throws BEFORE we can detect the email-sent case
+if (!authData?.user) throw new Error('No user returned')
+
+if (!authData?.session) {
+  setEmailSent(form.email)
+  return
+}
+```
+**CORRECT:**
+```jsx
+// Check session FIRST — PKCE returns session:null when confirmation is pending
+if (!authData?.session) {
+  localStorage.setItem('scop-pending-registration', JSON.stringify({ ... }))
+  setEmailSent(form.email)
+  return
+}
+
+// Only runs if session exists (non-PKCE / auto-confirmed accounts)
+if (!authData?.user) throw new Error('No user returned')
+```
+**Rule:** When `supabaseTemp.auth.signUp()` returns, ALWAYS check `!authData?.session` first. With PKCE+email confirmation, both `user` and `session` are null — checking `!user` first throws before you can detect the confirmation-pending state.
+
+---
+
+## BUG #140 — HIGH: Verification email link led to landing page instead of EmailVerify.jsx
+
+**Files:** src/pages/owner/Register.jsx, src/pages/owner/EmailVerify.jsx
+**Symptom:** Clicking the verification email button redirected to `https://scopsa.com/verify` but the landing page rendered instead of the email verification component.
+**Root cause (two parts):**
+1. `emailRedirectTo` was missing from the `signUp` call — Supabase fell back to the project's Site URL (`https://scopsa.com`), sending users to the root, which rendered Landing.jsx.
+2. `https://scopsa.com/verify` was not in the Supabase dashboard Redirect URLs allow-list — even after adding `emailRedirectTo`, Supabase silently ignores redirect URLs not on the allow-list and falls back to Site URL.
+
+**WRONG:**
+```jsx
+await supabaseTemp.auth.signUp({
+  email:    form.email,
+  password: form.password,
+  options:  { data: { name: form.ownerName } },  // no emailRedirectTo
+})
+```
+**CORRECT:**
+```jsx
+await supabaseTemp.auth.signUp({
+  email:    form.email,
+  password: form.password,
+  options: {
+    data:            { name: form.ownerName },
+    emailRedirectTo: 'https://scopsa.com/verify',
+  },
+})
+```
+**Rule:** Always pass `emailRedirectTo` in `signUp` options. Also: the redirect URL MUST be added to Authentication → URL Configuration → Redirect URLs in the Supabase dashboard, or Supabase silently ignores it. Both the code and the dashboard allow-list are required — one without the other does nothing.
+
+---
+
+## BUG #141 — HIGH: EmailVerify.jsx never called verifyOtp — waited passively for event that never fired
+
+**File:** src/pages/owner/EmailVerify.jsx
+**Symptom:** Navigating to `/verify?token_hash=...&type=signup` showed a spinner indefinitely, then the "link expired" card after 12 seconds. The session was never established.
+**Root cause:** The component relied entirely on `onAuthStateChange` firing a `SIGNED_IN` event. With PKCE flow, the Supabase client does NOT auto-exchange `token_hash` query params — the app must call `supabaseOwner.auth.verifyOtp({ token_hash, type })` explicitly. `getSession()` also returned null because no exchange had happened yet, so nothing ever triggered `completeSetup`.
+**WRONG:**
+```jsx
+// Passive — waits for an event that PKCE never fires automatically
+supabaseOwner.auth.getSession().then(({ data: { session } }) => {
+  if (session) completeSetup(session)
+})
+supabaseOwner.auth.onAuthStateChange((event, session) => {
+  if (event === 'SIGNED_IN' && session) completeSetup(session)
+})
+```
+**CORRECT:**
+```jsx
+// Explicit PKCE token exchange on mount
+const params    = new URLSearchParams(window.location.search)
+const tokenHash = params.get('token_hash')
+const type      = params.get('type')
+
+if (tokenHash) {
+  const { data, error } = await supabaseOwner.auth.verifyOtp({
+    token_hash: tokenHash,
+    type:       type === 'signup' ? 'signup' : 'email',
+  })
+  if (error) { setStatus('expired'); return }
+  if (data?.session) { completeSetup(data.session); return }
+}
+
+// Fallback: session may already exist or client may process hash tokens
+const { data: { session } } = await supabaseOwner.auth.getSession()
+if (session) { completeSetup(session); return }
+
+// Final fallback: listen for async SIGNED_IN (non-PKCE flows)
+supabaseOwner.auth.onAuthStateChange((event, sess) => {
+  if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && sess)
+    completeSetup(sess)
+})
+```
+**Rule:** Email verification pages MUST call `verifyOtp({ token_hash, type })` explicitly on mount when a `token_hash` query param is present. `onAuthStateChange` alone is not sufficient for PKCE — the token exchange must be initiated by the app. Always fall through to `getSession()` and `onAuthStateChange` as fallbacks for non-PKCE flows.
+
+---
+
+## Bug count: #038 – #141 (104 bugs total)
