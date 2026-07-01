@@ -47,12 +47,12 @@ function rateTrack(pct) {
 }
 
 // ── DIV-BASED BAR CHART ───────────────────────────────────────
-function BarChart({ data }) {
+function BarChart({ data, isMobile }) {
   const maxVal = Math.max(...data.map(d => d.completed + d.missed), 1)
-  const H      = 120
+  const H      = isMobile ? 80 : 120
 
   return (
-    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height: H + 24 }}>
+    <div style={{ display: 'flex', alignItems: 'flex-end', gap: isMobile ? 3 : 4, height: H + 24 }}>
       {data.map((d, i) => {
         const total = d.completed + d.missed
         const barH  = total > 0 ? Math.max(3, (total / maxVal) * H) : 0
@@ -60,7 +60,7 @@ function BarChart({ data }) {
         const missH = barH - compH
 
         return (
-          <div key={i} style={{ flex: 1, minWidth: 32, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <div key={i} style={{ flex: 1, minWidth: isMobile ? 28 : 32, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
             <div style={{ width: '100%', height: H, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
               {total > 0 ? (
                 <div style={{ width: '100%', overflow: 'hidden', borderRadius: '3px 3px 0 0' }}>
@@ -72,7 +72,7 @@ function BarChart({ data }) {
               )}
             </div>
             <div style={{ height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <span style={{ fontSize: 8, color: '#9CA3AF', whiteSpace: 'nowrap', lineHeight: 1 }}>{d.label}</span>
+              <span style={{ fontSize: isMobile ? 9 : 8, color: '#9CA3AF', whiteSpace: 'nowrap', lineHeight: 1 }}>{d.label}</span>
             </div>
           </div>
         )
@@ -360,8 +360,10 @@ export default function OwnerReports() {
         {isAr ? 'EN' : 'ع'}
       </button>
       <NotificationBell isAr={isAr} />
-      <button onClick={exportCSV} style={{ fontSize:11, fontWeight:600, color:'#1B4332', background:'#F0FDF4', border:'1px solid #BBF7D0', padding:'4px 10px', borderRadius:20, cursor:'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', gap:4 }}>
-        ↓ {isAr ? 'تصدير' : 'CSV'}
+      <button onClick={exportCSV}
+        aria-label={isAr ? 'تصدير CSV' : 'Export CSV'}
+        style={{ fontSize:16, color:'#1B4332', background:'#F0FDF4', border:'1px solid #BBF7D0', borderRadius:20, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', minWidth:44, minHeight:44 }}>
+        ↓
       </button>
     </div>
   ) : (
@@ -407,7 +409,7 @@ export default function OwnerReports() {
       topbarRight={reportsTopbarRight} branches={branches}>
 
       {/* Scrollable content */}
-      <div style={{ padding: '20px 24px' }}>
+      <div style={{ padding: isMobile ? '16px' : '20px 24px' }}>
 
           {/* Error banner */}
           {error && (
@@ -480,7 +482,7 @@ export default function OwnerReports() {
                     numColor: kpi.missed > 0 ? '#E24B4A' : '#111827',
                   },
                 ].map((c) => (
-                  <div key={c.label} style={{ background: '#fff', border: '1px solid #E8E4DC', borderRadius: 16, padding: 16 }}>
+                  <div key={c.label} style={{ background: '#fff', border: '1px solid #E8E4DC', borderRadius: 16, padding: isMobile ? 12 : 16 }}>
                     <div style={{ width: 36, height: 36, borderRadius: 10, background: c.iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, marginBottom: 10 }}>
                       {c.icon}
                     </div>
@@ -564,8 +566,8 @@ export default function OwnerReports() {
 
                   {/* Scrollable chart area */}
                   <div className="chart-scroll" style={{ overflowX: 'auto', width: '100%' }}>
-                    <div style={{ minWidth: Math.max(600, visibleData.length * 40) + 'px' }}>
-                      <BarChart data={visibleData} />
+                    <div style={{ minWidth: isMobile ? undefined : Math.max(600, visibleData.length * 40) + 'px' }}>
+                      <BarChart data={visibleData} isMobile={isMobile} />
                     </div>
                   </div>
                 </div>
