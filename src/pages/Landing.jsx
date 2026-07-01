@@ -479,7 +479,7 @@ export default function Landing() {
             {t(CTA_SEC.cta1)}
           </button>
           <a
-            href="https://wa.me/966XXXXXXXXX"
+            href="https://wa.me/966551553245"
             target="_blank"
             rel="noopener noreferrer"
             style={{
