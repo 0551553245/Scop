@@ -8,6 +8,7 @@ import { useLanguage } from '../../context/LanguageContext'
 import NotificationBell from '../../components/NotificationBell'
 import OwnerLayout from '../../components/OwnerLayout'
 import { getWeekStartStr } from '../../lib/weekUtils'
+import { getCached, setCached } from '../../lib/cache'
 
 // ── PERIODS ───────────────────────────────────────────────────
 const PERIODS = [
@@ -106,7 +107,18 @@ export default function OwnerReports() {
   const fetchData = useCallback(async () => {
     if (!profile) return
     setError('')
-    setLoading(true)
+
+    const today    = new Date().toISOString().split('T')[0]
+    const cacheKey = `owner-reports-${profile.id}-${today}`
+    const cached   = getCached(cacheKey)
+    if (cached) {
+      setBranches(cached.branches)
+      setTaskSubs(cached.taskSubs)
+      setFsSubs(cached.fsSubs)
+      setTaskDefs(cached.taskDefs)
+      setLoading(false)
+    }
+
     try {
       const { data: bData, error: bErr } = await supabaseOwner
         .from('branches')
@@ -123,7 +135,17 @@ export default function OwnerReports() {
       const start = (() => { const d = new Date(); d.setDate(d.getDate() - 89); return toDateStr(d) })()
       const end   = toDateStr(new Date())
 
-      const [fsRes, tasksRes, globalTasksRes] = await Promise.all([
+      // Paginate task_submissions — 90 days can exceed default row limits
+      const PAGE = 1000
+      const taskSubQuery = () => supabaseOwner
+        .from('task_submissions')
+        .select('id, status, branch_id, submitted_at, task_id, tasks(name, name_ar)')
+        .in('branch_id', ids)
+        .gte('submitted_at', `${start}T00:00:00.000Z`)
+        .lte('submitted_at', `${end}T23:59:59.999Z`)
+
+      // All 4 queries run simultaneously — page 0 task_submissions joins the round
+      const [fsRes, tasksRes, globalTasksRes, p0Res] = await Promise.all([
         supabaseOwner
           .from('food_safety_submissions')
           .select('id, result, branch_id, submitted_at, standard_id, food_safety_standards(id, name, name_ar)')
@@ -142,23 +164,14 @@ export default function OwnerReports() {
           .is('branch_id', null)
           .eq('is_active', true)
           .eq('created_by', profile.id),
+        taskSubQuery().range(0, PAGE - 1),
       ])
       if (fsRes.error)          throw fsRes.error
       if (tasksRes.error)       throw tasksRes.error
       if (globalTasksRes.error) throw globalTasksRes.error
+      if (p0Res.error)          throw p0Res.error
 
-      // Paginate task_submissions — 90 days can exceed default row limits
-      // Fetch page 0 first; if full, fetch remaining pages in parallel (max 5000 rows)
-      const PAGE = 1000
-      const taskSubQuery = () => supabaseOwner
-        .from('task_submissions')
-        .select('id, status, branch_id, submitted_at, task_id, tasks(name, name_ar)')
-        .in('branch_id', ids)
-        .gte('submitted_at', `${start}T00:00:00.000Z`)
-        .lte('submitted_at', `${end}T23:59:59.999Z`)
-      const { data: p0Data, error: p0Err } = await taskSubQuery().range(0, PAGE - 1)
-      if (p0Err) throw p0Err
-      let allTaskSubs = p0Data || []
+      let allTaskSubs = p0Res.data || []
       if (allTaskSubs.length === PAGE) {
         const extraPages = await Promise.all(
           [1, 2, 3, 4].map(p => taskSubQuery().range(p * PAGE, (p + 1) * PAGE - 1))
@@ -171,11 +184,19 @@ export default function OwnerReports() {
         }
       }
 
-      const allTaskDefs = [...(tasksRes.data || []), ...(globalTasksRes.data || [])]
+      const allTaskDefs   = [...(tasksRes.data || []), ...(globalTasksRes.data || [])]
       const activeTaskIds = new Set(allTaskDefs.map(t => t.id))
-      setTaskSubs(allTaskSubs.filter(s => activeTaskIds.has(s.task_id)))
-      setFsSubs(fsRes.data     || [])
+      const filteredSubs  = allTaskSubs.filter(s => activeTaskIds.has(s.task_id))
+
+      setTaskSubs(filteredSubs)
+      setFsSubs(fsRes.data || [])
       setTaskDefs(allTaskDefs)
+      setCached(cacheKey, {
+        branches: bList,
+        taskSubs: filteredSubs,
+        fsSubs:   fsRes.data || [],
+        taskDefs: allTaskDefs,
+      }, 300000)
     } catch (err) {
       console.error('Reports fetch error:', err)
       setError('Failed to load report data.')

@@ -5,20 +5,20 @@ const MAX_ENTRIES = 100
 export function getCached(key) {
   const entry = CACHE[key]
   if (!entry) return null
-  if (Date.now() - entry.time > TTL) {
+  if (Date.now() - entry.time > (entry.ttl ?? TTL)) {
     delete CACHE[key]
     return null
   }
   return entry.data
 }
 
-export function setCached(key, data) {
+export function setCached(key, data, ttl) {
   const keys = Object.keys(CACHE)
   if (keys.length >= MAX_ENTRIES) {
     const oldest = keys.sort((a, b) => CACHE[a].time - CACHE[b].time)[0]
     delete CACHE[oldest]
   }
-  CACHE[key] = { data, time: Date.now() }
+  CACHE[key] = { data, time: Date.now(), ttl }
 }
 
 export function invalidateCache(key) {
