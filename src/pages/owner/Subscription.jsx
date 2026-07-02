@@ -142,7 +142,7 @@ export default function OwnerSubscription() {
         billing: billingRes.data || [],
         planLimits: limits,
         whatsappNumber: waNum,
-      })
+      }, 120000)
     } catch (err) {
       console.error('Subscription fetch error:', err)
       if (!cached) setError(isAr ? 'فشل تحميل بيانات الاشتراك' : 'Failed to load subscription data.')
