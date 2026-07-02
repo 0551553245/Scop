@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useLanguage } from '../context/LanguageContext'
+import ScopLogo from '../components/ScopLogo'
 
 // ─── translations ─────────────────────────────────────────────────────────────
 
@@ -215,9 +216,7 @@ export default function Landing() {
         height: 60, display: 'flex', alignItems: 'center',
         justifyContent: 'space-between', padding: '0 40px',
       }}>
-        <span style={{ fontSize: 22, fontWeight: 500, color: '#1B4332', cursor: 'default', letterSpacing: '-0.3px' }}>
-          Scop
-        </span>
+        <ScopLogo variant="full" />
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <button
             onClick={toggleLang}
@@ -500,7 +499,7 @@ export default function Landing() {
         padding: '20px 40px', display: 'flex', alignItems: 'center',
         justifyContent: 'space-between', flexWrap: 'wrap', gap: 12,
       }}>
-        <span style={{ fontSize: 16, fontWeight: 500, color: '#1B4332' }}>Scop</span>
+        <ScopLogo variant="sidebar" />
         <span style={{ fontSize: 12, color: '#9CA3AF', textAlign: 'center' }}>
           {t(FOOTER.copy)}
         </span>

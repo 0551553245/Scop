@@ -5,6 +5,7 @@ import { useOwnerAuth } from '../context/OwnerAuthContext'
 import { useLanguage } from '../context/LanguageContext'
 import { prefetchOwnerTasks } from '../lib/prefetch'
 import NotificationBell from './NotificationBell'
+import ScopLogo from './ScopLogo'
 
 const DVH = window.CSS?.supports('height', '100dvh') ? '100dvh' : '100vh'
 
@@ -80,7 +81,7 @@ export default function OwnerLayout({ activePath, title, titleAr, topbarLeft, to
       {/* ── SIDEBAR ── */}
       <div style={sidebarStyle}>
         <div style={{ padding: '20px 20px 16px', borderBottom: '1px solid #F3F4F6' }}>
-          <div style={{ fontSize: 22, fontWeight: 800, color: '#1B4332', letterSpacing: '-0.5px' }}>Scop</div>
+          <ScopLogo variant="sidebar" />
           <div style={{ fontSize: 10, color: '#9CA3AF', marginTop: 2, letterSpacing: '0.5px', textTransform: 'uppercase' }}>
             {isAr ? 'عمليات المطاعم' : 'Restaurant Operations'}
           </div>

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useIsMobile } from '../hooks/useIsMobile'
 import { Link } from 'react-router-dom'
+import ScopLogo from './ScopLogo'
 
 const DVH = window.CSS?.supports('height', '100dvh') ? '100dvh' : '100vh'
 
@@ -41,7 +42,7 @@ export function AdminSidebar({ currentPath, profile, isAr, handleSignOut, isMobi
   return (
     <div style={sidebarStyle}>
       <div style={{ padding: '20px 20px 16px', borderBottom: '0.5px solid #E5E7EB' }}>
-        <div style={{ fontSize: 22, fontWeight: 800, color: '#1B4332' }}>Scop</div>
+        <ScopLogo variant="sidebar" />
         <div style={{ fontSize: 10, color: '#9CA3AF', marginTop: 2, letterSpacing: '0.5px', textTransform: 'uppercase' }}>
           {isAr ? 'إدارة المنصة' : 'Platform Admin'}
         </div>

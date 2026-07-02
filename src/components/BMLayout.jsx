@@ -4,6 +4,7 @@ import { useNavigate, Link } from 'react-router-dom'
 import { useBranchManagerAuth } from '../context/BranchManagerAuthContext'
 import { useLanguage } from '../context/LanguageContext'
 import { prefetchBMDailyTasks } from '../lib/prefetch'
+import ScopLogo from './ScopLogo'
 
 const DVH = window.CSS?.supports('height', '100dvh') ? '100dvh' : '100vh'
 
@@ -63,7 +64,7 @@ export default function BMLayout({ activePath, title, titleAr, subtitle, branchN
       {/* ── SIDEBAR ── */}
       <div style={sidebarStyle}>
         <div style={{ padding:16, borderBottom:'0.5px solid #E5E7EB' }}>
-          <div style={{ fontSize:18, fontWeight:500, color:'#1B4332' }}>Scop</div>
+          <ScopLogo variant="sidebar" />
           <div style={{ fontSize:10, color:'#9CA3AF', marginTop:2, textTransform:'uppercase', letterSpacing:'0.5px' }}>Restaurant Ops</div>
         </div>
         <div style={{ padding:'12px 10px 4px' }}>
