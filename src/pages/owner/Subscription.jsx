@@ -8,6 +8,7 @@ import { calcRate } from '../../lib/stats'
 import SubscriptionBanner from '../../components/SubscriptionBanner'
 import { getPlatformSettings, getPlanLimits, DEFAULT_SETTINGS } from '../../lib/platformSettings'
 import OwnerLayout from '../../components/OwnerLayout'
+import { useIsMobile } from '../../hooks/useIsMobile'
 
 const PLAN_FEATURES = {
   trial:   { branches: 1,  managers: 1,  price: 0,   label: 'Free Trial', labelAr: 'تجربة مجانية' },
@@ -76,6 +77,8 @@ function billingStatusStyle(status) {
   if (status === 'failed' || status === 'declined')                        return { bg:'#FFF1F2', color:'#9F1239' }
   return { bg:'#FFFBEB', color:'#92400E' }
 }
+
+const PLAN_RANK = { trial:0, starter:1, growth:2, pro:3 }
 
 export default function OwnerSubscription() {
   const { profile }  = useOwnerAuth()
@@ -153,14 +156,15 @@ export default function OwnerSubscription() {
 
   useEffect(() => { fetchExtra() }, [fetchExtra])
 
+  const isMobile = useIsMobile()
   const loading   = subLoading || loadingExtra
 
   if (loading) return (
     <OwnerLayout activePath="/owner/subscription" title="Subscription" titleAr="الاشتراك">
-      <div style={{ padding:'20px 24px' }}>
+      <div style={{ padding: isMobile ? '16px' : '20px 24px' }}>
         <div className="skeleton" style={{ height:220, marginBottom:16 }} />
-        <div className="skeleton" style={{ height:180, marginBottom:16 }} />
-        <div className="skeleton" style={{ height:180 }} />
+        <div className="skeleton" style={{ height:320, marginBottom:16 }} />
+        <div className="skeleton" style={{ height:200 }} />
       </div>
     </OwnerLayout>
   )
@@ -189,157 +193,225 @@ export default function OwnerSubscription() {
       ? (isAr ? `تنتهي التجربة في ${formatDate(subscription.trial_ends_at || subscription.expires_at, lang)} · ${daysLeft} يوم متبقي` : `Trial ends on ${formatDate(subscription.trial_ends_at || subscription.expires_at, lang)} · ${daysLeft} days left`)
       : (isAr ? `يتجدد في ${formatDate(subscription.expires_at, lang)} · ${daysLeft} يوم متبقي` : `Renews on ${formatDate(subscription.expires_at, lang)} · ${daysLeft} days left`)
 
+  const curRank = PLAN_RANK[subscription?.plan ?? 'trial'] ?? 0
+
   return (
     <OwnerLayout activePath="/owner/subscription" title="Subscription" titleAr="الاشتراك">
+      <div style={{ padding: isMobile ? '16px' : '20px 24px' }}>
 
-      {/* Content */}
-      <div style={{ padding:'20px 24px' }}>
+        <SubscriptionBanner
+          subscription={subscription}
+          daysLeft={daysLeft}
+          isTrial={isTrial}
+          isExpired={isExpired}
+          expiringSoon={expiringSoon}
+          isAr={isAr}
+          supportWhatsapp={whatsappNumber}
+        />
 
-          <SubscriptionBanner
-            subscription={subscription}
-            daysLeft={daysLeft}
-            isTrial={isTrial}
-            isExpired={isExpired}
-            expiringSoon={expiringSoon}
-            isAr={isAr}
-            supportWhatsapp={whatsappNumber}
-          />
+        {error && (
+          <div style={{ background:'#FFF1F2', border:'1px solid #FECDD3', borderRadius:12, padding:'12px 16px', marginBottom:16, color:'#9F1239', fontSize:13, display:'flex', alignItems:'center', justifyContent:'space-between', gap:12 }}>
+            <span>{error}</span>
+            <button onClick={fetchExtra} style={{ background:'none', border:'1px solid #FECDD3', borderRadius:8, padding:'4px 12px', color:'#9F1239', fontSize:12, fontWeight:500, cursor:'pointer', flexShrink:0, fontFamily:'inherit' }}>
+              {isAr ? 'إعادة المحاولة' : 'Retry'}
+            </button>
+          </div>
+        )}
 
-          {error && (
-            <div style={{ background:'#FFF1F2', border:'1px solid #FECDD3', borderRadius:12, padding:'12px 16px', marginBottom:16, color:'#9F1239', fontSize:13, display:'flex', alignItems:'center', justifyContent:'space-between', gap:12 }}>
-              <span>{error}</span>
-              <button onClick={fetchExtra} style={{ background:'none', border:'1px solid #FECDD3', borderRadius:8, padding:'4px 12px', color:'#9F1239', fontSize:12, fontWeight:500, cursor:'pointer', flexShrink:0, fontFamily:'inherit' }}>
-                {isAr ? 'إعادة المحاولة' : 'Retry'}
-              </button>
-            </div>
-          )}
+        {!subscription ? (
+          <div style={{ background:'#fff', border:'1px solid #E5E7EB', borderRadius:18, padding:40, textAlign:'center' }}>
+            <div style={{ fontSize:40, marginBottom:12 }}>💳</div>
+            <div style={{ fontSize:15, fontWeight:700, color:'#111827', marginBottom:6 }}>{isAr?'لا توجد بيانات اشتراك':'No subscription found'}</div>
+            <div style={{ fontSize:13, color:'#6B7280' }}>{isAr?'تواصل معنا لتفعيل اشتراكك':'Contact us to activate your subscription'}</div>
+          </div>
+        ) : (
+          <>
+            {/* ── HERO CARD ── */}
+            <div style={{ background:'#1B4332', borderRadius:20, padding: isMobile ? 20 : 28, color:'#fff', marginBottom:20 }}>
+              <div style={{ display:'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent:'space-between', alignItems: isMobile ? 'stretch' : 'flex-start', gap:20 }}>
 
-          {!subscription ? (
-            <div style={{ background:'#fff', border:'1px solid #E5E7EB', borderRadius:18, padding:40, textAlign:'center' }}>
-              <div style={{ fontSize:40, marginBottom:12 }}>💳</div>
-              <div style={{ fontSize:15, fontWeight:700, color:'#111827', marginBottom:6 }}>{isAr?'لا توجد بيانات اشتراك':'No subscription found'}</div>
-              <div style={{ fontSize:13, color:'#6B7280' }}>{isAr?'تواصل معنا لتفعيل اشتراكك':'Contact us to activate your subscription'}</div>
-            </div>
-          ) : (
-            <>
-              {/* ── PLAN HERO CARD ── */}
-              <div style={{ background:'#1B4332', borderRadius:20, padding:24, color:'#fff', marginBottom:16 }}>
-                <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', flexWrap:'wrap', gap:16 }}>
-                  <div>
-                    <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:6 }}>
-                      <span style={{ fontSize:18, fontWeight:800 }}>{isAr ? plan.labelAr : plan.label}</span>
-                      <span style={{ fontSize:11, fontWeight:700, padding:'3px 10px', borderRadius:20, background:badge.bg, color:badge.color }}>
-                        {isAr ? badge.ar : badge.en}
-                      </span>
-                    </div>
-                    <div style={{ fontSize:28, fontWeight:800, letterSpacing:'-0.5px' }}>{priceLabel}</div>
+                {/* Left — plan identity */}
+                <div style={{ flex:1 }}>
+                  <div style={{ fontSize:11, fontWeight:600, color:'rgba(255,255,255,0.5)', textTransform:'uppercase', letterSpacing:'1px', marginBottom:10 }}>
+                    {isAr ? 'خطتك الحالية' : 'Current Plan'}
                   </div>
-                  <div style={{ textAlign: isAr ? 'left' : 'right', fontSize:12, color:'rgba(255,255,255,0.75)' }}>
-                    {renewalText}
+                  <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:10, flexWrap:'wrap' }}>
+                    <span style={{ fontSize:22, fontWeight:700 }}>{isAr ? plan?.labelAr : plan?.label}</span>
+                    <span style={{ fontSize:11, fontWeight:700, padding:'3px 10px', borderRadius:20, background:badge.bg, color:badge.color }}>
+                      {isAr ? badge.ar : badge.en}
+                    </span>
                   </div>
+                  <div style={{ fontSize:12, color:'rgba(255,255,255,0.6)', lineHeight:1.6 }}>{renewalText}</div>
                 </div>
 
-                {/* Usage bars */}
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginTop:20 }}>
-                  <div style={{ background:'rgba(255,255,255,0.08)', borderRadius:14, padding:14 }}>
-                    <div style={{ display:'flex', justifyContent:'space-between', fontSize:12, marginBottom:8 }}>
-                      <span style={{ color:'rgba(255,255,255,0.7)' }}>{isAr?'الفروع':'Branches'}</span>
-                      <span style={{ fontWeight:700 }}>{branchCount} / {subscription.branches_limit}</span>
-                    </div>
-                    <div style={{ height:6, background:'rgba(255,255,255,0.15)', borderRadius:20, overflow:'hidden' }}>
-                      <div style={{ height:'100%', width:`${branchPct}%`, background:'#4ADE80', borderRadius:20, transition:'width 0.5s ease' }} />
-                    </div>
-                  </div>
-                  <div style={{ background:'rgba(255,255,255,0.08)', borderRadius:14, padding:14 }}>
-                    <div style={{ display:'flex', justifyContent:'space-between', fontSize:12, marginBottom:8 }}>
-                      <span style={{ color:'rgba(255,255,255,0.7)' }}>{isAr?'المديرون':'Managers'}</span>
-                      <span style={{ fontWeight:700 }}>{managerCount} / {subscription.managers_limit}</span>
-                    </div>
-                    <div style={{ height:6, background:'rgba(255,255,255,0.15)', borderRadius:20, overflow:'hidden' }}>
-                      <div style={{ height:'100%', width:`${managerPct}%`, background: usageColor(managerPct), borderRadius:20, transition:'width 0.5s ease' }} />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* ── WHAT'S INCLUDED ── */}
-              <div style={{ background:'#fff', border:'1px solid #E5E7EB', borderRadius:18, padding:22, marginBottom:16 }}>
-                <div style={{ fontSize:14, fontWeight:700, color:'#111827', marginBottom:14 }}>{isAr?"ما يشمله اشتراكك":"What's included"}</div>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
-                  {features.map((f, i) => (
-                    <div key={i} style={{ display:'flex', alignItems:'center', gap:8, fontSize:13, color:'#374151' }}>
-                      <span style={{ color:'#1B4332', fontWeight:700 }}>✓</span>
-                      {isAr ? f.ar : f.en}
+                {/* Right — 3 stat boxes */}
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:10, flexShrink:0 }}>
+                  {[
+                    { num: branchCount,          limit: subscription.branches_limit, labelEn:'Branches',  labelAr:'الفروع'      },
+                    { num: managerCount,          limit: subscription.managers_limit, labelEn:'Managers',  labelAr:'المديرون'    },
+                    { num: Math.max(0, daysLeft), limit: null,                        labelEn:'Days Left', labelAr:'أيام متبقية' },
+                  ].map(({ num, limit, labelEn, labelAr: lAr }) => (
+                    <div key={labelEn} style={{ background:'rgba(255,255,255,0.08)', borderRadius:14, padding:'14px 10px', textAlign:'center' }}>
+                      <div style={{ fontSize:22, fontWeight:800, color:'#4ADE80', lineHeight:1 }}>{num}</div>
+                      {limit !== null && <div style={{ fontSize:9, color:'rgba(255,255,255,0.35)', marginTop:2 }}>/ {limit}</div>}
+                      <div style={{ fontSize:10, color:'rgba(255,255,255,0.5)', marginTop:4 }}>{isAr ? lAr : labelEn}</div>
                     </div>
                   ))}
                 </div>
               </div>
+            </div>
 
-              {/* ── UPGRADE SECTION ── */}
-              {nextPlan && (
-                <div id="upgrade-section" style={{ background:'#F0FDF4', border:'1px solid #BBF7D0', borderRadius:18, padding:22, marginBottom:16, display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:16 }}>
-                  <div>
-                    <div style={{ fontSize:13, fontWeight:700, color:'#166534', marginBottom:4 }}>
-                      {isAr ? `الترقية إلى ${nextPlan.labelAr}` : `Upgrade to ${nextPlan.label}`}
+            {/* ── SECTION LABEL ── */}
+            <div style={{ fontSize:12, fontWeight:700, color:'#9CA3AF', textTransform:'uppercase', letterSpacing:'1px', marginBottom:14 }}>
+              {isAr ? 'اختر خطة' : 'Choose a plan'}
+            </div>
+
+            {/* ── PLAN CARDS ── */}
+            <div style={{ display:'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3,1fr)', gap:14, marginBottom:20 }}>
+              {[
+                {
+                  key: 'starter',
+                  icon: (
+                    <div style={{ width:40, height:40, background:'#F0FDF4', borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', marginBottom:16 }}>
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                        <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" stroke="#1B4332" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        <path d="M9 22V12h6v10" stroke="#1B4332" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
                     </div>
-                    <div style={{ fontSize:12, color:'#166534', opacity:0.8 }}>
-                      {isAr
-                        ? `${nextPlan.branches} فروع · ${nextPlan.managers >= 99 ? 'مديرون غير محدودين' : `${nextPlan.managers} مديرين`} · ${nextPlan.price} ريال/شهر`
-                        : `${nextPlan.branches} branches · ${nextPlan.managers >= 99 ? 'unlimited managers' : `${nextPlan.managers} managers`} · ${nextPlan.price} SAR/mo`}
+                  ),
+                },
+                {
+                  key: 'growth',
+                  icon: (
+                    <div style={{ width:40, height:40, background:'#EFF6FF', borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', marginBottom:16 }}>
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                        <path d="M18 20V10M12 20V4M6 20v-6" stroke="#378ADD" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
                     </div>
+                  ),
+                },
+                {
+                  key: 'pro',
+                  icon: (
+                    <div style={{ width:40, height:40, background:'#F5F3FF', borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', marginBottom:16 }}>
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                        <path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 00-2.91-.09z" stroke="#7C3AED" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        <path d="M12 15l-3-3a22 22 0 002-3.95A12.88 12.88 0 0122 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 01-4 2z" stroke="#7C3AED" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        <path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5" stroke="#7C3AED" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    </div>
+                  ),
+                },
+              ].map(({ key, icon }) => {
+                const pf       = PLAN_FEATURES[key]
+                const pl       = planLimits[key] || {}
+                const cardRank = PLAN_RANK[key] ?? 1
+                const isCurr   = subscription.plan === key
+                const isBelow  = curRank > cardRank
+                const cardPrice = pl.price === 0
+                  ? (isAr ? 'مجاني' : 'Free')
+                  : isAr ? `${pl.price} ريال/شهر` : `${pl.price} SAR/mo`
+                const featList = FEATURE_LIST[key] || []
+                return (
+                  <div key={key} style={{ background:'#fff', border: isCurr ? '2px solid #1B4332' : '1.5px solid #E5E7EB', borderRadius:18, padding:22, position:'relative', display:'flex', flexDirection:'column' }}>
+                    {isCurr && (
+                      <div style={{ position:'absolute', top:-12, [isAr ? 'right' : 'left']: 18, background:'#1B4332', color:'#fff', fontSize:10, fontWeight:700, padding:'3px 12px', borderRadius:20 }}>
+                        {isAr ? 'خطتك' : 'Your plan'}
+                      </div>
+                    )}
+                    {icon}
+                    <div style={{ fontSize:15, fontWeight:700, color:'#111827', marginBottom:4 }}>{isAr ? pf.labelAr : pf.label}</div>
+                    <div style={{ fontSize:20, fontWeight:800, color:'#111827', marginBottom:16 }}>{cardPrice}</div>
+                    <div style={{ flex:1, marginBottom:20 }}>
+                      {featList.map((f, i) => (
+                        <div key={i} style={{ display:'flex', alignItems:'center', gap:8, fontSize:12, color:'#374151', marginBottom:8 }}>
+                          <span style={{ color:'#1B4332', fontWeight:700, fontSize:13 }}>✓</span>
+                          {isAr ? f.ar : f.en}
+                        </div>
+                      ))}
+                    </div>
+                    {isCurr ? (
+                      <button disabled style={{ width:'100%', padding:'10px', background:'#F0FDF4', color:'#166534', border:'1.5px solid #BBF7D0', borderRadius:10, fontSize:13, fontWeight:600, cursor:'default', fontFamily:'inherit' }}>
+                        {isAr ? 'خطتك الحالية' : 'Your plan'}
+                      </button>
+                    ) : isBelow ? (
+                      <button onClick={() => alert(isAr ? 'التخفيض للخطة الأدنى قريباً' : 'Downgrade coming soon')} style={{ width:'100%', padding:'10px', background:'#fff', color:'#6B7280', border:'1.5px solid #E5E7EB', borderRadius:10, fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>
+                        {isAr ? `الرجوع إلى ${pf.labelAr}` : `Downgrade to ${pf.label}`}
+                      </button>
+                    ) : (
+                      <button onClick={() => alert(isAr ? 'الدفع عبر موياسر قريباً' : 'Moyasar payment coming soon')} style={{ width:'100%', padding:'10px', background:'#1B4332', color:'#fff', border:'none', borderRadius:10, fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>
+                        {isAr ? `الترقية إلى ${pf.labelAr} ←` : `Upgrade to ${pf.label} →`}
+                      </button>
+                    )}
                   </div>
-                  {whatsappNumber && (
-                    <a href={`https://wa.me/${whatsappNumber.replace(/[^\d]/g, '')}`} target="_blank" rel="noopener noreferrer"
-                      style={{ padding:'10px 20px', background:'#1B4332', color:'#fff', borderRadius:10, fontSize:13, fontWeight:600, textDecoration:'none', whiteSpace:'nowrap' }}>
-                      {isAr ? 'تواصل معنا للترقية' : 'Contact us to upgrade'}
-                    </a>
-                  )}
+                )
+              })}
+            </div>
+
+            {/* ── BOTTOM GRID ── */}
+            <div style={{ display:'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap:14 }}>
+
+              {/* Billing History */}
+              <div style={{ background:'#fff', border:'1.5px solid #E5E7EB', borderRadius:18, padding:22 }}>
+                <div style={{ fontSize:13, fontWeight:700, color:'#111827', marginBottom:16 }}>
+                  {isAr ? 'سجل الفواتير' : 'Billing History'}
                 </div>
-              )}
-
-              {/* ── BILLING HISTORY ── */}
-              <div style={{ background:'#fff', border:'1px solid #E5E7EB', borderRadius:18, padding:22 }}>
-                <div style={{ fontSize:14, fontWeight:700, color:'#111827', marginBottom:14 }}>{isAr?'سجل الفواتير':'Billing History'}</div>
-
                 {billing.length === 0 ? (
                   <div style={{ textAlign:'center', padding:'24px 0', color:'#9CA3AF', fontSize:13 }}>
                     {isAr ? 'لا يوجد سجل فواتير بعد' : 'No billing history yet'}
                   </div>
                 ) : (
-                  <div style={{ overflowX:'auto' }}>
-                    <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
-                      <thead>
-                        <tr style={{ borderBottom:'1px solid #F3F4F6' }}>
-                          <th style={{ textAlign: isAr?'right':'left', padding:'8px 6px', color:'#9CA3AF', fontWeight:600, fontSize:11, textTransform:'uppercase' }}>{isAr?'التاريخ':'Date'}</th>
-                          <th style={{ textAlign: isAr?'right':'left', padding:'8px 6px', color:'#9CA3AF', fontWeight:600, fontSize:11, textTransform:'uppercase' }}>{isAr?'الخطة':'Plan'}</th>
-                          <th style={{ textAlign: isAr?'right':'left', padding:'8px 6px', color:'#9CA3AF', fontWeight:600, fontSize:11, textTransform:'uppercase' }}>{isAr?'المبلغ':'Amount'}</th>
-                          <th style={{ textAlign: isAr?'right':'left', padding:'8px 6px', color:'#9CA3AF', fontWeight:600, fontSize:11, textTransform:'uppercase' }}>{isAr?'الحالة':'Status'}</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {billing.map(row => {
-                          const bs = billingStatusStyle(row.status)
-                          return (
-                            <tr key={row.id} style={{ borderBottom:'1px solid #F9FAFB' }}>
-                              <td style={{ padding:'10px 6px', color:'#374151' }}>{formatDate(row.paid_at, lang)}</td>
-                              <td style={{ padding:'10px 6px', color:'#374151', textTransform:'capitalize' }}>{row.plan}</td>
-                              <td style={{ padding:'10px 6px', color:'#111827', fontWeight:600 }}>{row.amount} {row.currency}</td>
-                              <td style={{ padding:'10px 6px' }}>
-                                <span style={{ fontSize:11, fontWeight:600, padding:'3px 10px', borderRadius:20, background:bs.bg, color:bs.color, textTransform:'capitalize' }}>
-                                  {row.status}
-                                </span>
-                              </td>
-                            </tr>
-                          )
-                        })}
-                      </tbody>
-                    </table>
+                  <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+                    {billing.map(row => {
+                      const bs = billingStatusStyle(row.status)
+                      const statusLabel = (row.status === 'paid' || row.status === 'success' || row.status === 'completed')
+                        ? (isAr ? 'مدفوع' : 'Paid')
+                        : (row.status === 'failed' || row.status === 'declined')
+                          ? (isAr ? 'فشل' : 'Failed')
+                          : (isAr ? 'معلق' : 'Pending')
+                      return (
+                        <div key={row.id} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'12px 14px', background:'#F9FAFB', borderRadius:12 }}>
+                          <div>
+                            <div style={{ fontSize:13, fontWeight:600, color:'#111827', textTransform:'capitalize' }}>
+                              {row.plan || (isAr ? 'اشتراك' : 'Subscription')}
+                            </div>
+                            <div style={{ fontSize:11, color:'#9CA3AF', marginTop:2 }}>{formatDate(row.paid_at, lang)}</div>
+                          </div>
+                          <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                            <span style={{ fontSize:14, fontWeight:700, color:'#111827' }}>{row.amount} {row.currency}</span>
+                            <span style={{ fontSize:10, fontWeight:700, padding:'3px 10px', borderRadius:20, background:bs.bg, color:bs.color }}>
+                              {statusLabel}
+                            </span>
+                          </div>
+                        </div>
+                      )
+                    })}
                   </div>
                 )}
               </div>
-            </>
-          )}
-        </div>
+
+              {/* Payment Method */}
+              <div style={{ background:'#fff', border:'1.5px solid #E5E7EB', borderRadius:18, padding:22 }}>
+                <div style={{ fontSize:13, fontWeight:700, color:'#111827', marginBottom:16 }}>
+                  {isAr ? 'طريقة الدفع' : 'Payment Method'}
+                </div>
+                <div style={{ background:'#F9FAFB', border:'1.5px solid #E5E7EB', borderRadius:12, padding:'20px 16px', marginBottom:16, textAlign:'center' }}>
+                  <div style={{ fontSize:32, marginBottom:8 }}>💳</div>
+                  <div style={{ fontSize:13, color:'#6B7280' }}>
+                    {isAr ? 'لم تُضَف طريقة دفع بعد' : 'No payment method added yet'}
+                  </div>
+                </div>
+                <button
+                  onClick={() => alert(isAr ? 'الدفع عبر موياسر قريباً' : 'Moyasar payment coming soon')}
+                  style={{ width:'100%', padding:'11px', background:'#1B4332', color:'#fff', border:'none', borderRadius:10, fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}
+                >
+                  {isAr ? 'إضافة بطاقة عبر موياسر' : 'Add card via Moyasar'}
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
     </OwnerLayout>
   )
 }
