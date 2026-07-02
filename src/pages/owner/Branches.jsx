@@ -9,6 +9,7 @@ import { useSubscription } from '../../hooks/useSubscription'
 import SubscriptionGuard from '../../components/SubscriptionGuard'
 import NotificationBell from '../../components/NotificationBell'
 import OwnerLayout from '../../components/OwnerLayout'
+import { getCached, setCached, invalidateCache } from '../../lib/cache'
 
 function getHealthScore(taskPct, fsPct) {
   if (taskPct === null && fsPct === null) return null
@@ -72,9 +73,16 @@ export default function OwnerBranches() {
     if (!profile) return
     setError('')
 
-    try {
-      const today = new Date().toISOString().split('T')[0]
+    const today    = new Date().toISOString().split('T')[0]
+    const cacheKey = `owner-branches-${profile.id}-${today}`
+    const cached   = getCached(cacheKey)
+    if (cached) {
+      setBranches(cached.branches)
+      setBranchData(cached.branchData)
+      setLoading(false)
+    }
 
+    try {
       // Get all branches for this owner
       const { data: bData, error: bErr } = await supabaseOwner
         .from('branches')
@@ -133,6 +141,7 @@ export default function OwnerBranches() {
         dataMap[b.id] = { taskPct, fsPct, done, pending, missed, mgrName, mgrNameAr, mgrInit }
       })
       setBranchData(dataMap)
+      setCached(cacheKey, { branches: allBranches, branchData: dataMap })
 
     } catch (err) {
       console.error('Branches fetch error:', err)
@@ -147,10 +156,12 @@ export default function OwnerBranches() {
   // ── REAL-TIME ─────────────────────────────────────────────
   useEffect(() => {
     if (!profile) return
+    const today    = new Date().toISOString().split('T')[0]
+    const cacheKey = `owner-branches-${profile.id}-${today}`
     const ch = supabaseOwner.channel(`branches-${profile.id}`)
-      .on('postgres_changes', { event:'*', schema:'public', table:'task_submissions' }, () => { fetchBranches() })
-      .on('postgres_changes', { event:'*', schema:'public', table:'food_safety_submissions' }, () => { fetchBranches() })
-      .on('postgres_changes', { event:'*', schema:'public', table:'branches' }, () => { fetchBranches() })
+      .on('postgres_changes', { event:'*', schema:'public', table:'task_submissions' },        () => { invalidateCache(cacheKey); fetchBranches() })
+      .on('postgres_changes', { event:'*', schema:'public', table:'food_safety_submissions' }, () => { invalidateCache(cacheKey); fetchBranches() })
+      .on('postgres_changes', { event:'*', schema:'public', table:'branches' },                () => { invalidateCache(cacheKey); fetchBranches() })
       .subscribe()
     return () => supabaseOwner.removeChannel(ch)
   }, [profile?.id, fetchBranches])
