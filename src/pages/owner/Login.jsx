@@ -108,6 +108,36 @@ export default function OwnerLogin() {
         return
       }
 
+      // Fetch profile before navigating — runs in parallel with auth context's
+      // own fetchProfile (triggered by SIGNED_IN), closing the race window.
+      const { data: profile, error: profileError } =
+        await supabaseOwner
+          .from('users')
+          .select('id, role, is_active')
+          .eq('id', authData.user.id)
+          .single()
+
+      if (profileError || !profile) {
+        await supabaseOwner.auth.signOut()
+        setError(t.errGeneric)
+        setLoading(false)
+        return
+      }
+
+      if (profile.role !== 'owner') {
+        await supabaseOwner.auth.signOut()
+        setError(t.errRole)
+        setLoading(false)
+        return
+      }
+
+      if (!profile.is_active) {
+        await supabaseOwner.auth.signOut()
+        setError(t.errInactive)
+        setLoading(false)
+        return
+      }
+
       navigate('/owner/dashboard')
 
     } catch {
