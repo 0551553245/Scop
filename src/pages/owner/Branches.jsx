@@ -260,16 +260,27 @@ export default function OwnerBranches() {
     boxSizing:'border-box', transition:'border-color 0.15s',
   }
 
-  if (loading) return (
-    <OwnerLayout activePath="/owner/branches" title="Branches" titleAr="الفروع"
-      topbarLeft={branchesTopbarLeft} topbarRight={branchesTopbarRight}>
-      <div style={{ padding:'20px 24px' }}>
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(2,1fr)', gap:14 }}>
-          {['a','b','c','d'].map(k => <div key={k} className="skeleton" style={{ height:180 }} />)}
+  if (loading) {
+    const sk = (extra = {}) => ({
+      background: '#F0FDF4',
+      animation: 'scopPulse 1.6s ease-in-out infinite',
+      borderRadius: 10,
+      ...extra,
+    })
+    return (
+      <OwnerLayout activePath="/owner/branches" title="Branches" titleAr="الفروع"
+        topbarLeft={branchesTopbarLeft} topbarRight={branchesTopbarRight}>
+        <div style={{ padding: '20px 24px' }}>
+          <style>{`@keyframes scopPulse{0%,100%{opacity:1}50%{opacity:.4}}`}</style>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 12 }}>
+            {[0, 1, 2, 3].map(i => (
+              <div key={i} style={sk({ height: 180, borderRadius: 18 })} />
+            ))}
+          </div>
         </div>
-      </div>
-    </OwnerLayout>
-  )
+      </OwnerLayout>
+    )
+  }
 
   return (
     <OwnerLayout activePath="/owner/branches" title="Branches" titleAr="الفروع"
