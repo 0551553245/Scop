@@ -706,6 +706,18 @@ export default function OwnerRegister() {
               style={{ width: '100%', padding: '10px', background: 'transparent', color: '#6B7280', border: '0.5px solid #E5E7EB', borderRadius: 10, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>
               {isAr ? '→ رجوع' : '← Back'}
             </button>
+            <p dir={isAr ? 'rtl' : 'ltr'} style={{ textAlign: 'center', fontSize: 11, color: '#9CA3AF', margin: '10px 0 0', lineHeight: 1.6 }}>
+              {isAr ? (
+                <>بإنشاء حساب، أنت توافق على{' '}
+                  <Link to="/terms-of-service" style={{ color: '#1B4332', textDecoration: 'underline', textUnderlineOffset: 2 }}>شروط الخدمة</Link>
+                  {' '}و<Link to="/privacy-policy" style={{ color: '#1B4332', textDecoration: 'underline', textUnderlineOffset: 2 }}>سياسة الخصوصية</Link></>
+              ) : (
+                <>By creating an account you agree to our{' '}
+                  <Link to="/terms-of-service" style={{ color: '#1B4332', textDecoration: 'underline', textUnderlineOffset: 2 }}>Terms of Service</Link>
+                  {' '}and{' '}
+                  <Link to="/privacy-policy" style={{ color: '#1B4332', textDecoration: 'underline', textUnderlineOffset: 2 }}>Privacy Policy</Link></>
+              )}
+            </p>
           </div>
         </div>
         <PageStyles />

@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { useLanguage } from '../context/LanguageContext'
 import ScopLogo from '../components/ScopLogo'
 
@@ -137,8 +137,9 @@ const CTA_SEC = {
 
 const FOOTER = {
   copy:    { en: '© 2026 Scop · Restaurant Operations Platform · Saudi Arabia', ar: '© 2026 سكوب · منصة عمليات المطاعم · المملكة العربية السعودية' },
-  privacy: { en: 'Privacy', ar: 'الخصوصية' },
-  terms:   { en: 'Terms', ar: 'الشروط' },
+  privacy: { en: 'Privacy Policy', ar: 'سياسة الخصوصية' },
+  terms:   { en: 'Terms of Service', ar: 'شروط الخدمة' },
+  refund:  { en: 'Refund Policy', ar: 'سياسة الاسترجاع' },
 }
 
 // ─── icon ─────────────────────────────────────────────────────────────────────
@@ -504,8 +505,9 @@ export default function Landing() {
           {t(FOOTER.copy)}
         </span>
         <div style={{ display: 'flex', gap: 16 }}>
-          <a href="#" style={{ fontSize: 12, color: '#6B7280', textDecoration: 'none' }}>{t(FOOTER.privacy)}</a>
-          <a href="#" style={{ fontSize: 12, color: '#6B7280', textDecoration: 'none' }}>{t(FOOTER.terms)}</a>
+          <Link to="/privacy-policy"   style={{ fontSize: 12, color: '#6B7280', textDecoration: 'none' }}>{t(FOOTER.privacy)}</Link>
+          <Link to="/terms-of-service" style={{ fontSize: 12, color: '#6B7280', textDecoration: 'none' }}>{t(FOOTER.terms)}</Link>
+          <Link to="/refund-policy"    style={{ fontSize: 12, color: '#6B7280', textDecoration: 'none' }}>{t(FOOTER.refund)}</Link>
         </div>
       </footer>
     </div>

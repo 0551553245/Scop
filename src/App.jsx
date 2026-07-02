@@ -7,6 +7,9 @@ import { AdminAuthProvider, useAdminAuth } from './context/AdminAuthContext'
 import ProtectedRoute from './components/ProtectedRoute'
 
 const Landing               = lazy(() => import('./pages/Landing'))
+const PrivacyPolicy         = lazy(() => import('./pages/PrivacyPolicy'))
+const TermsOfService        = lazy(() => import('./pages/TermsOfService'))
+const RefundPolicy          = lazy(() => import('./pages/RefundPolicy'))
 const OwnerLogin            = lazy(() => import('./pages/owner/Login'))
 const OwnerRegister         = lazy(() => import('./pages/owner/Register'))
 const OwnerForgotPassword   = lazy(() => import('./pages/owner/ForgotPassword'))
@@ -79,6 +82,9 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/verify" element={<OwnerEmailVerify />} />
+          <Route path="/privacy-policy"   element={<PrivacyPolicy />} />
+          <Route path="/terms-of-service" element={<TermsOfService />} />
+          <Route path="/refund-policy"    element={<RefundPolicy />} />
 
           <Route path="/owner" element={<OwnerLayout />}>
             <Route path="login" element={<OwnerLogin />} />
