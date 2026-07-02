@@ -282,22 +282,51 @@ export default function OwnerDashboard() {
   )
 
   // ── LOADING SKELETON ────────────────────────────────────────
-  if (loading) return (
-    <OwnerLayout activePath="/owner/dashboard" title="Dashboard" titleAr="لوحة التحكم"
-      branches={branches} topbarRight={dashTopbarRight}>
-      <div style={{ padding: '20px 24px' }}>
-        <div className="skeleton" style={{ height: 36, width: 300, marginBottom: 16, borderRadius: 20 }} />
-        <div className="skeleton" style={{ height: 80, marginBottom: 16, borderRadius: 12 }} />
-        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3,1fr)', gap: 12, marginBottom: 16 }}>
-          {['a', 'b', 'c'].map(k => <div key={k} className="skeleton" style={{ height: 140, borderRadius: 12 }} />)}
+  if (loading) {
+    const sk = (extra = {}) => ({
+      background: '#F0FDF4',
+      animation: 'scopPulse 1.6s ease-in-out infinite',
+      borderRadius: 10,
+      ...extra,
+    })
+    return (
+      <OwnerLayout activePath="/owner/dashboard" title="Dashboard" titleAr="لوحة التحكم"
+        branches={branches} topbarRight={dashTopbarRight}>
+        <div style={{ padding: '20px 24px' }}>
+          <style>{`@keyframes scopPulse{0%,100%{opacity:1}50%{opacity:.4}}`}</style>
+
+          {/* Welcome */}
+          <div style={{ marginBottom: 16 }}>
+            <div style={sk({ width: 210, height: 24, borderRadius: 8, marginBottom: 8 })} />
+            <div style={sk({ width: 270, height: 14, borderRadius: 6 })} />
+          </div>
+
+          {/* Branch switcher */}
+          <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+            {[100, 120, 90].map((w, i) => (
+              <div key={i} style={sk({ width: w, height: 34, borderRadius: 20 })} />
+            ))}
+          </div>
+
+          {/* Health banner */}
+          <div style={sk({ height: 86, borderRadius: 12, marginBottom: 16 })} />
+
+          {/* 3 frequency cards */}
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3,1fr)', gap: 12, marginBottom: 12 }}>
+            {[0, 1, 2].map(i => (
+              <div key={i} style={sk({ height: 192, borderRadius: 12 })} />
+            ))}
+          </div>
+
+          {/* Food safety + next event */}
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 12 }}>
+            <div style={sk({ height: 192, borderRadius: 12 })} />
+            <div style={sk({ height: 192, borderRadius: 12 })} />
+          </div>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <div className="skeleton" style={{ height: 160, borderRadius: 12 }} />
-          <div className="skeleton" style={{ height: 160, borderRadius: 12 }} />
-        </div>
-      </div>
-    </OwnerLayout>
-  )
+      </OwnerLayout>
+    )
+  }
 
   // ── ERROR STATE ──────────────────────────────────────────────
   if (error) return (
