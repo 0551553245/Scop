@@ -48,27 +48,6 @@ export function AdminAuthProvider({ children }) {
   }
 
   useEffect(() => {
-    // Initialize from existing session with an 8-second timeout
-    const sessionPromise = supabaseAdmin.auth.getSession().then(r => ({ ...r, timedOut: false }))
-    const timeoutPromise = new Promise(resolve => setTimeout(() => resolve({ timedOut: true }), 8000))
-
-    Promise.race([sessionPromise, timeoutPromise]).then(async (result) => {
-      if (result.timedOut) {
-        setLoading(false)
-        return
-      }
-
-      const sessionUser = result.data?.session?.user ?? null
-      setUser(sessionUser)
-
-      if (sessionUser) {
-        await fetchProfile(sessionUser.id)
-      }
-
-      setLoading(false)
-    })
-
-    // Subscribe to auth state changes
     const { data: { subscription } } = supabaseAdmin.auth.onAuthStateChange(
       async (_event, session) => {
         if (_event === 'SIGNED_OUT') {
@@ -76,19 +55,34 @@ export function AdminAuthProvider({ children }) {
           setProfile(null)
           _adminCache = null
           _adminCacheUserId = null
+          setLoading(false)
           return
         }
-        const sessionUser = session?.user ?? null
-        setUser(sessionUser)
-        if (sessionUser) {
-          await fetchProfile(sessionUser.id)
-        } else {
-          setProfile(null)
+        if (_event === 'INITIAL_SESSION' || _event === 'SIGNED_IN') {
+          setLoading(true)
+          const sessionUser = session?.user ?? null
+          setUser(sessionUser)
+          if (sessionUser) {
+            await fetchProfile(sessionUser.id)
+          } else {
+            setProfile(null)
+          }
+          setLoading(false)
+          return
         }
+        // TOKEN_REFRESHED / USER_UPDATED — silent update, no loading change
+        const sessionUser = session?.user ?? null
+        if (sessionUser) setUser(sessionUser)
       }
     )
 
-    return () => subscription.unsubscribe()
+    // Safety-net: if INITIAL_SESSION never fires, unblock ProtectedRoute after 8 s
+    const timer = setTimeout(() => setLoading(false), 8000)
+
+    return () => {
+      clearTimeout(timer)
+      subscription.unsubscribe()
+    }
   }, [])
 
   async function signOut() {

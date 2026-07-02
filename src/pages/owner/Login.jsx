@@ -108,36 +108,6 @@ export default function OwnerLogin() {
         return
       }
 
-      const userId = authData.user.id
-
-      const { data: profile, error: profileError } =
-        await supabaseOwner
-          .from('users')
-          .select('id, role, is_active, name')
-          .eq('id', userId)
-          .single()
-
-      if (profileError || !profile) {
-        await supabaseOwner.auth.signOut()
-        setError(t.errGeneric)
-        setLoading(false)
-        return
-      }
-
-      if (profile.role !== 'owner') {
-        await supabaseOwner.auth.signOut()
-        setError(t.errRole)
-        setLoading(false)
-        return
-      }
-
-      if (!profile.is_active) {
-        await supabaseOwner.auth.signOut()
-        setError(t.errInactive)
-        setLoading(false)
-        return
-      }
-
       navigate('/owner/dashboard')
 
     } catch {

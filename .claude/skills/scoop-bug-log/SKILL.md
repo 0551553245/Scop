@@ -1378,3 +1378,56 @@ supabaseOwner.auth.onAuthStateChange((event, sess) => {
 ---
 
 ## Bug count: #038 – #141 (104 bugs total)
+
+---
+
+## BUG #142 — CRITICAL: navigate('/owner/dashboard') fired before setUser() was committed to React state
+
+**Files:** src/pages/owner/Login.jsx, src/context/OwnerAuthContext.jsx, src/context/BranchManagerAuthContext.jsx, src/context/AdminAuthContext.jsx
+**Symptom:** After successful login on the owner panel, the app redirected to `/owner/dashboard` but showed a blank white page. The page rendered correctly only after a manual browser refresh. Happened inconsistently — sometimes fast, sometimes slow, sometimes stuck on login with a valid session.
+**WRONG:**
+```jsx
+// Login.jsx fetched its own profile after signInWithPassword()
+// then called navigate() — but onAuthStateChange (context) was firing concurrently.
+// At the moment navigate() ran, context's setUser() may not yet have been committed.
+// ProtectedRoute saw: user=null, loading=false → redirected to /owner/login with replace.
+
+navigate('/owner/dashboard')  // fires while context still has user=null
+```
+```js
+// OwnerAuthContext: loading became false only after getSession() resolved (no session at mount).
+// After login, loading was ALREADY false — no guard prevented ProtectedRoute from redirecting.
+Promise.race([sessionPromise, timeoutPromise]).then(async (result) => {
+  // ...
+  setLoading(false)  // only fires once, at mount — post-login SIGNED_IN did not touch loading
+})
+```
+**CORRECT:**
+```jsx
+// Login.jsx — strip to 4 operations only:
+const { data: authData, error: authError } = await supabaseOwner.auth.signInWithPassword(...)
+if (authError) { setError(t.errInvalid); setLoading(false); return }
+if (!authData.user.email_confirmed_at) { ... setError(t.errUnverified); return }
+navigate('/owner/dashboard')  // context handles everything else via onAuthStateChange
+```
+```js
+// OwnerAuthContext — onAuthStateChange is now the sole authority for loading:
+onAuthStateChange(async (_event, session) => {
+  if (_event === 'SIGNED_OUT') { ...clear state...; setLoading(false); return }
+
+  if (_event === 'INITIAL_SESSION' || _event === 'SIGNED_IN') {
+    setLoading(true)              // ← hold ProtectedRoute during profile fetch
+    setUser(session?.user ?? null)
+    if (session?.user) await fetchProfile(session.user.id)
+    else setProfile(null)
+    setLoading(false)             // ← now ProtectedRoute can decide
+    return
+  }
+  // TOKEN_REFRESHED / USER_UPDATED: silent setUser(), no loading change
+})
+// 5-second safety-net in case INITIAL_SESSION never fires:
+const timer = setTimeout(() => setLoading(false), 5000)
+```
+**Rule:** Never navigate() immediately after signInWithPassword() and rely on ProtectedRoute to see the new user. Always let onAuthStateChange set loading=true on SIGNED_IN and loading=false only after fetchProfile() completes. ProtectedRoute's existing `if (loading) → spinner` guard then naturally holds the redirect until auth state is stable. Login.jsx must not do its own profile fetch — the auth context owns this. Apply to all three panels (Owner, BM, Admin).
+
+## Bug count: #038 – #142 (105 bugs total)

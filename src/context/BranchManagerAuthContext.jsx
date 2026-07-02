@@ -68,27 +68,6 @@ export function BranchManagerAuthProvider({ children }) {
   }
 
   useEffect(() => {
-    // Initialize from existing session with a 5-second timeout
-    const sessionPromise = supabaseBranchManager.auth.getSession().then(r => ({ ...r, timedOut: false }))
-    const timeoutPromise = new Promise(resolve => setTimeout(() => resolve({ timedOut: true }), 5000))
-
-    Promise.race([sessionPromise, timeoutPromise]).then(async (result) => {
-      if (result.timedOut) {
-        setLoading(false)
-        return
-      }
-
-      const sessionUser = result.data?.session?.user ?? null
-      setUser(sessionUser)
-
-      if (sessionUser) {
-        await fetchProfile(sessionUser.id)
-      }
-
-      setLoading(false)
-    })
-
-    // Subscribe to auth state changes
     const { data: { subscription } } = supabaseBranchManager.auth.onAuthStateChange(
       async (_event, session) => {
         if (_event === 'SIGNED_OUT') {
@@ -97,15 +76,24 @@ export function BranchManagerAuthProvider({ children }) {
           setOwnerSubscription(null)
           _bmProfileCache = null
           _bmProfileCacheUserId = null
+          setLoading(false)
           return
         }
-        const sessionUser = session?.user ?? null
-        setUser(sessionUser)
-        if (sessionUser) {
-          await fetchProfile(sessionUser.id)
-        } else {
-          setProfile(null)
+        if (_event === 'INITIAL_SESSION' || _event === 'SIGNED_IN') {
+          setLoading(true)
+          const sessionUser = session?.user ?? null
+          setUser(sessionUser)
+          if (sessionUser) {
+            await fetchProfile(sessionUser.id)
+          } else {
+            setProfile(null)
+          }
+          setLoading(false)
+          return
         }
+        // TOKEN_REFRESHED / USER_UPDATED — silent update, no loading change
+        const sessionUser = session?.user ?? null
+        if (sessionUser) setUser(sessionUser)
       }
     )
 
@@ -122,7 +110,11 @@ export function BranchManagerAuthProvider({ children }) {
     }
     document.addEventListener('visibilitychange', handleVisibility)
 
+    // Safety-net: if INITIAL_SESSION never fires, unblock ProtectedRoute after 5 s
+    const timer = setTimeout(() => setLoading(false), 5000)
+
     return () => {
+      clearTimeout(timer)
       subscription.unsubscribe()
       document.removeEventListener('visibilitychange', handleVisibility)
     }
