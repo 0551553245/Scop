@@ -92,39 +92,42 @@ export default function EmailVerify() {
     }
 
     async function tryVerify() {
-      // 1. Parse token_hash and type from the URL (PKCE flow appends these as query params)
-      const params     = new URLSearchParams(window.location.search)
-      const tokenHash  = params.get('token_hash')
-      const type       = params.get('type')   // 'signup' | 'email' | 'recovery' etc.
+      const params    = new URLSearchParams(window.location.search)
+      const tokenHash = params.get('token_hash')
+      const type      = params.get('type')
 
-      if (tokenHash) {
-        const { data, error } = await supabaseOwner.auth.verifyOtp({
-          token_hash: tokenHash,
-          type:       type === 'signup' ? 'signup' : 'email',
-        })
-        if (error) {
-          if (!settled) { settled = true; setStatus('expired') }
-          return
-        }
-        if (data?.session) { completeSetup(data.session); return }
-      }
-
-      // 2. Fallback: check if supabaseOwner already has a session
-      //    (handles implicit-flow hash tokens the client auto-processes)
-      const { data: { session } } = await supabaseOwner.auth.getSession()
-      if (session) { completeSetup(session); return }
-
-      // 3. Listen for SIGNED_IN fired by the client when it processes URL tokens
+      // FIX 1: Register listener BEFORE any async calls — catches SIGNED_IN
+      // even if detectSessionInUrl fires it during client initialization
       const { data: { subscription } } = supabaseOwner.auth.onAuthStateChange((event, sess) => {
         if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && sess) {
           completeSetup(sess)
         }
       })
 
-      // 4. Give up after 12 s if nothing fires
       const timer = setTimeout(() => {
         if (!settled) { settled = true; setStatus('expired') }
       }, 12000)
+
+      if (tokenHash) {
+        // FIX 2: Don't return early on error — fall through to getSession()
+        // Token may already be consumed by detectSessionInUrl on client init
+        const { data, error } = await supabaseOwner.auth.verifyOtp({
+          token_hash: tokenHash,
+          type:       type === 'signup' ? 'signup' : 'email',
+        })
+        if (!error && data?.session) {
+          completeSetup(data.session)
+          return () => { subscription.unsubscribe(); clearTimeout(timer) }
+        }
+      }
+
+      // FIX 3: Always call getSession() regardless of verifyOtp() outcome —
+      // detectSessionInUrl may have already established the session client-side
+      const { data: { session } } = await supabaseOwner.auth.getSession()
+      if (session) {
+        completeSetup(session)
+        return () => { subscription.unsubscribe(); clearTimeout(timer) }
+      }
 
       return () => {
         subscription.unsubscribe()

@@ -1431,3 +1431,63 @@ const timer = setTimeout(() => setLoading(false), 5000)
 **Rule:** Never navigate() immediately after signInWithPassword() and rely on ProtectedRoute to see the new user. Always let onAuthStateChange set loading=true on SIGNED_IN and loading=false only after fetchProfile() completes. ProtectedRoute's existing `if (loading) → spinner` guard then naturally holds the redirect until auth state is stable. Login.jsx must not do its own profile fetch — the auth context owns this. Apply to all three panels (Owner, BM, Admin).
 
 ## Bug count: #038 – #142 (105 bugs total)
+
+---
+
+## BUG #143 — CRITICAL: verifyOtp() error returned early — getSession() fallback unreachable after detectSessionInUrl consumed token
+
+**File:** src/pages/owner/EmailVerify.jsx
+**Symptom:** All new users see "Verification link expired" immediately after clicking a valid verification email. Token is valid — Supabase processes it. Issue is 100% reproducible regardless of how quickly the user clicks.
+**Root cause:** `supabaseOwner` is created in `supabase.js` at module scope with `detectSessionInUrl: true` (the default). When the browser loads `/verify?token_hash=HASH&type=signup`, the JS bundle loads, `supabaseOwner` initializes, detects `token_hash` in `window.location.search`, calls its internal token exchange, **consumes the token**, establishes a session, and fires `SIGNED_IN` — all before `EmailVerify.jsx` mounts (it is `React.lazy`). When `useEffect` later runs `tryVerify()`:
+1. `token_hash` is still in the URL → `verifyOtp()` is called explicitly
+2. Token already consumed → Supabase returns "One-time token not found"
+3. Error path: `setStatus('expired')` → **`return`** — never reaches `getSession()` on the next line
+4. `getSession()` would have returned the already-established session if reached
+5. `onAuthStateChange` listener was registered *after* the try block — misses `SIGNED_IN` that already fired during client init
+
+**WRONG:**
+```js
+if (tokenHash) {
+  const { data, error } = await supabaseOwner.auth.verifyOtp({ token_hash, type })
+  if (error) {
+    if (!settled) { settled = true; setStatus('expired') }
+    return   // ← dead end: session exists in client but is never checked
+  }
+  if (data?.session) { completeSetup(data.session); return }
+}
+// getSession() only reachable when no tokenHash — unreachable on any real link click
+const { data: { session } } = await supabaseOwner.auth.getSession()
+// listener registered after failure — misses SIGNED_IN that already fired
+const { data: { subscription } } = supabaseOwner.auth.onAuthStateChange(...)
+```
+
+**CORRECT:**
+```js
+// Register listener FIRST — catches SIGNED_IN even if fired during client init
+const { data: { subscription } } = supabaseOwner.auth.onAuthStateChange((event, sess) => {
+  if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && sess) {
+    completeSetup(sess)
+  }
+})
+const timer = setTimeout(...)
+
+if (tokenHash) {
+  const { data, error } = await supabaseOwner.auth.verifyOtp({ token_hash, type })
+  if (!error && data?.session) {
+    completeSetup(data.session)
+    return () => { subscription.unsubscribe(); clearTimeout(timer) }
+  }
+  // error: fall through — do NOT return
+}
+
+// Always call getSession() — finds session established by detectSessionInUrl
+const { data: { session } } = await supabaseOwner.auth.getSession()
+if (session) {
+  completeSetup(session)
+  return () => { subscription.unsubscribe(); clearTimeout(timer) }
+}
+```
+
+**Rule:** NEVER return early in the `verifyOtp()` error path when `tokenHash` is present. The Supabase client (`detectSessionInUrl: true` by default) may have already consumed the token and established a session before the component mounts. Always fall through to `getSession()` to check. Register `onAuthStateChange` BEFORE any async call so it catches `SIGNED_IN` that fires during client initialization. The three-layer approach: (1) listener first, (2) explicit `verifyOtp()` attempt, (3) `getSession()` fallback — always in this order.
+
+## Bug count: #038 – #143 (106 bugs total)
