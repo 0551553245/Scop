@@ -1490,4 +1490,56 @@ if (session) {
 
 **Rule:** NEVER return early in the `verifyOtp()` error path when `tokenHash` is present. The Supabase client (`detectSessionInUrl: true` by default) may have already consumed the token and established a session before the component mounts. Always fall through to `getSession()` to check. Register `onAuthStateChange` BEFORE any async call so it catches `SIGNED_IN` that fires during client initialization. The three-layer approach: (1) listener first, (2) explicit `verifyOtp()` attempt, (3) `getSession()` fallback — always in this order.
 
-## Bug count: #038 – #143 (106 bugs total)
+## BUG #144 — CRITICAL SECURITY: ProtectedRoute only checked user, not profile — non-owner could access all /owner/* routes
+
+**Files:** src/context/OwnerAuthContext.jsx, src/components/ProtectedRoute.jsx
+**Symptom:** A branch manager with valid Supabase auth credentials but no `public.users` row (trigger never ran) could authenticate via the owner login page, remain signed in, and directly navigate to `/owner/dashboard` and all other `/owner/*` routes indefinitely — surviving page refreshes.
+**Root cause:** Two gaps that together form a complete bypass:
+1. `OwnerAuthContext.fetchProfile()` Path B (profile row missing): when `error || !data`, it called `setProfile(null)` and returned — but did NOT call `signOut()`. The manager's session stayed alive in `scop-owner-session` with `user` truthy and `profile` null.
+2. `ProtectedRoute` destructured only `{ user, loading }` from `useAuthHook()` — `profile` was never checked. The gate was `if (!user) → redirect`. Any non-null `user` with `loading=false` passed, regardless of profile existence or role.
+
+**WRONG — OwnerAuthContext Path B:**
+```js
+if (error || !data) {
+  // kept session alive with no profile
+  setProfile(null)
+  return null
+}
+```
+
+**WRONG — ProtectedRoute:**
+```js
+const { user, loading } = useAuthHook()
+// ...
+if (!user) {
+  return <Navigate to={loginPath} replace />
+}
+return <Outlet />  // profile=null still passed through
+```
+
+**CORRECT — OwnerAuthContext Path B:**
+```js
+if (error || !data) {
+  await supabaseOwner.auth.signOut()
+  setUser(null)
+  setProfile(null)
+  _profileCache = null
+  _profileCacheUserId = null
+  setLoading(false)
+  return null
+}
+```
+
+**CORRECT — ProtectedRoute:**
+```js
+const { user, profile, loading } = useAuthHook()
+// ...
+if (!user || !profile) {
+  return <Navigate to={loginPath} replace />
+}
+return <Outlet />
+```
+
+**Rule:** `ProtectedRoute` MUST always check both `user` AND `profile` before rendering `<Outlet />`. Any auth context code path that results in `profile = null` MUST also call `signOut()` immediately — a null profile with a live session is an open door. Path B (missing row) must be treated identically to Path A (wrong role): sign out, clear all state, return null.
+
+## Bug count: #038 – #144 (107 bugs total)

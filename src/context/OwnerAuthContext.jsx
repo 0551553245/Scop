@@ -26,8 +26,12 @@ export function OwnerAuthProvider({ children }) {
       .single()
 
     if (error || !data) {
-      // Network error or profile missing — keep the auth session, just clear the profile
+      await supabaseOwner.auth.signOut()
+      setUser(null)
       setProfile(null)
+      _profileCache = null
+      _profileCacheUserId = null
+      setLoading(false)
       return null
     }
 

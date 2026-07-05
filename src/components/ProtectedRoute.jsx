@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Navigate, Outlet } from 'react-router-dom'
 
 export default function ProtectedRoute({ useAuthHook, loginPath }) {
-  const { user, loading } = useAuthHook()
+  const { user, profile, loading } = useAuthHook()
   const [timedOut, setTimedOut] = useState(false)
 
   // If loading takes more than 8 seconds, force redirect to login
@@ -42,7 +42,7 @@ export default function ProtectedRoute({ useAuthHook, loginPath }) {
     )
   }
 
-  if (!user) {
+  if (!user || !profile) {
     return <Navigate to={loginPath} replace />
   }
 
