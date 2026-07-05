@@ -3,6 +3,7 @@ import { supabaseBranchManager } from '../../lib/supabase'
 import { useBranchManagerAuth } from '../../context/BranchManagerAuthContext'
 import { getCached, setCached } from '../../lib/cache'
 import { useLanguage } from '../../context/LanguageContext'
+import { useIsMobile } from '../../hooks/useIsMobile'
 import BMLayout from '../../components/BMLayout'
 
 const DAYS_EN = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']
@@ -63,6 +64,7 @@ function getHourRow(startTime) {
 export default function BMSchedule() {
   const { profile } = useBranchManagerAuth()
   const { isAr }    = useLanguage()
+  const isMobile    = useIsMobile()
 
   const [weekOffset, setWeekOffset] = useState(0)
   const [events,     setEvents]     = useState([])
@@ -70,6 +72,7 @@ export default function BMSchedule() {
   const [loading,    setLoading]    = useState(true)
   const [error,      setError]      = useState('')
   const [selectedEv, setSelectedEv] = useState(null)
+  const [mobileTab,  setMobileTab]  = useState('today') // 'today' | 'week'
 
   const weekDates = getWeekDates(weekOffset)
   const today     = new Date()
@@ -154,10 +157,242 @@ export default function BMSchedule() {
     </BMLayout>
   )
 
+  // ── Shared calendar grid (used in both desktop left panel and mobile week tab) ──
+  const calendarGrid = (
+    <div style={{ background:'#fff', border:'0.5px solid #E5E7EB', borderRadius:12, overflow:'hidden', flex:1, display:'flex', flexDirection:'column' }}>
+      <div style={{ overflowX:'auto', flex:1, display:'flex', flexDirection:'column' }}>
+      <div style={{ minWidth:600, display:'flex', flexDirection:'column', flex:1 }}>
+
+      {/* Day headers */}
+      <div style={{ display:'grid', gridTemplateColumns:'44px repeat(7,1fr)', borderBottom:'0.5px solid #E5E7EB', flexShrink:0 }}>
+        <div />
+        {weekDates.map((d, i) => {
+          const isToday = d.toISOString().split('T')[0] === todayStr
+          return (
+            <div key={d.toISOString().split('T')[0]} style={{ padding:'10px 4px', textAlign:'center' }}>
+              <div style={{ fontSize:11, fontWeight:500, color:'#9CA3AF', textTransform:'uppercase', letterSpacing:'0.5px' }}>
+                {isAr ? DAYS_AR[i] : DAYS_EN[i]}
+              </div>
+              <div style={{ marginTop:2, display:'flex', alignItems:'center', justifyContent:'center' }}>
+                {isToday ? (
+                  <div style={{ width:26, height:26, background:'#1B4332', color:'#fff', borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', fontSize:13, fontWeight:500 }}>
+                    {d.getDate()}
+                  </div>
+                ) : (
+                  <div style={{ fontSize:14, fontWeight:500, color:'#111827' }}>{d.getDate()}</div>
+                )}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Time grid */}
+      <div style={{ overflowY:'auto', flex:1 }}>
+        <div style={{ display:'grid', gridTemplateColumns:'44px repeat(7,1fr)' }}>
+          {HOURS.map((hour, hourIdx) => (
+            <>
+              {/* Time label */}
+              <div key={`lbl-${hourIdx}`} style={{ fontSize:11, color:'#9CA3AF', textAlign:'right', padding:'5px 6px 0', borderRight:'0.5px solid #E5E7EB', borderBottom:'0.5px solid #F3F4F6' }}>
+                {hour}
+              </div>
+              {/* Day cells */}
+              {weekDates.map((d, dayIdx) => {
+                const isToday    = d.toISOString().split('T')[0] === todayStr
+                const cellEvents = getEventsAt(dayIdx, hourIdx)
+                return (
+                  <div key={`cell-${hourIdx}-${dayIdx}`}
+                    style={{ borderRight: dayIdx < 6 ? '0.5px solid #E5E7EB' : 'none', borderBottom:'0.5px solid #F3F4F6', minHeight:50, padding:2, background: isToday ? 'rgba(27,67,50,0.02)' : 'transparent' }}>
+                    {cellEvents.map(ev => {
+                      const cs = getCatStyle(ev.category)
+                      return (
+                        <div key={ev.id}
+                          onClick={() => setSelectedEv(selectedEv?.id === ev.id ? null : ev)}
+                          style={{ borderRadius:6, padding:'4px 7px', margin:1, cursor:'pointer', background:cs.bg, color:cs.color, transition:'all 0.15s' }}
+                          onMouseEnter={e=>e.currentTarget.style.filter='brightness(0.95)'}
+                          onMouseLeave={e=>e.currentTarget.style.filter='none'}
+                        >
+                          <div style={{ fontSize:10, fontWeight:500, lineHeight:1.2 }}>
+                            {isAr ? ev.title_ar || ev.title : ev.title}
+                          </div>
+                          {ev.start_time && (
+                            <div style={{ fontSize:9, opacity:0.7, marginTop:1 }}>{formatTime(ev.start_time)}</div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )
+              })}
+            </>
+          ))}
+        </div>
+      </div>
+    </div>
+    </div>
+    </div>
+  )
+
+  // ── Shared right-panel content (used in desktop and mobile today tab) ──
+  const LEGEND_ITEMS = [
+    { bg:'#DCFCE7', border:'#166534', label:'Inspection', labelAr:'تفتيش' },
+    { bg:'#EDE9FE', border:'#5B21B6', label:'Training',   labelAr:'تدريب' },
+    { bg:'#FFEDD5', border:'#9A3412', label:'Safety',     labelAr:'سلامة' },
+    { bg:'#F3F4F6', border:'#E5E7EB', label:'Audit',      labelAr:'تدقيق' },
+  ]
+
   return (
     <BMLayout activePath="/branch-manager/schedule" title="Schedule" titleAr="الجدول"
       subtitle={weekLabel} branchName={branchName}>
-      <div style={{ height:'100%', overflow:'hidden', padding:'16px 20px', display:'flex', gap:16 }}>
+
+      {isMobile ? (
+
+        /* ── MOBILE LAYOUT ─────────────────────────────────────── */
+        <div style={{ display:'flex', flexDirection:'column', height:'100%', overflow:'hidden' }}>
+
+          {/* Tab toggle */}
+          <div style={{ display:'flex', gap:8, padding:'12px 16px', flexShrink:0 }}>
+            {[
+              { key:'today', en:'Today',     ar:'اليوم'      },
+              { key:'week',  en:'This week', ar:'هذا الأسبوع' },
+            ].map(tab => (
+              <button key={tab.key} onClick={() => setMobileTab(tab.key)}
+                style={{
+                  flex:1, padding:'9px 12px', borderRadius:10, border:'none',
+                  fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'inherit',
+                  background: mobileTab === tab.key ? '#1B4332' : '#fff',
+                  color:      mobileTab === tab.key ? '#fff'    : '#6B7280',
+                  boxShadow:  mobileTab === tab.key ? 'none'    : 'inset 0 0 0 0.5px #E5E7EB',
+                }}
+              >
+                {isAr ? tab.ar : tab.en}
+              </button>
+            ))}
+          </div>
+
+          {mobileTab === 'today' ? (
+
+            /* ── MOBILE TODAY PANEL ────────────────────────────── */
+            <div style={{ flex:1, overflowY:'auto', padding:'0 16px 20px' }}>
+
+              {/* Date header + events */}
+              <div style={{ background:'#fff', border:'0.5px solid #E5E7EB', borderRadius:12, overflow:'hidden', marginBottom:12 }}>
+                <div style={{ padding:'14px 16px', borderBottom:'0.5px solid #E5E7EB' }}>
+                  <div style={{ fontSize:14, fontWeight:600, color:'#111827' }}>
+                    {isAr
+                      ? `اليوم — ${new Date().toLocaleDateString('ar-SA',{weekday:'short',month:'short',day:'numeric'})}`
+                      : `Today — ${new Date().toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})}`}
+                  </div>
+                  <div style={{ fontSize:11, color:'#9CA3AF', marginTop:2 }}>
+                    {todayEvents.length} {isAr ? 'أحداث مجدولة' : 'events scheduled'}
+                  </div>
+                </div>
+
+                {todayEvents.length === 0 ? (
+                  <div style={{ padding:'36px 16px', textAlign:'center' }}>
+                    <div style={{ fontSize:36, marginBottom:10 }}>📅</div>
+                    <div style={{ fontSize:14, fontWeight:500, color:'#111827', marginBottom:4 }}>
+                      {isAr ? 'لا توجد أحداث اليوم' : 'No events today'}
+                    </div>
+                    <div style={{ fontSize:12, color:'#9CA3AF' }}>
+                      {isAr ? 'تحقق من عرض الأسبوع للأحداث القادمة' : 'Check the week view for upcoming events'}
+                    </div>
+                  </div>
+                ) : (
+                  todayEvents.map((ev, i) => {
+                    const cs        = getCatStyle(ev.category)
+                    const isActive  = selectedEv?.id === ev.id
+                    const countdown = getCountdown(ev.event_date, ev.start_time, isAr)
+                    return (
+                      <div key={ev.id}
+                        onClick={() => setSelectedEv(isActive ? null : ev)}
+                        style={{ padding:'14px 16px', borderBottom: i < todayEvents.length-1 ? '0.5px solid #E5E7EB' : 'none', cursor:'pointer', background:isActive?'#F0FDF4':'#fff', transition:'background 0.15s' }}
+                      >
+                        <div style={{ display:'inline-flex', alignItems:'center', gap:4, fontSize:11, color:'#9CA3AF', marginBottom:4 }}>
+                          🕐 {formatTime(ev.start_time)}
+                        </div>
+                        <div style={{ fontSize:14, fontWeight:500, color:'#111827' }}>
+                          {isAr ? ev.title_ar || ev.title : ev.title}
+                        </div>
+                        {ev.description && (
+                          <div style={{ fontSize:12, color:'#6B7280', marginTop:3, lineHeight:1.4 }}>{ev.description}</div>
+                        )}
+                        <div style={{ display:'flex', alignItems:'center', gap:6, marginTop:6, flexWrap:'wrap' }}>
+                          <span style={{ fontSize:11, fontWeight:500, padding:'3px 8px', borderRadius:20, background:cs.bg, color:cs.color }}>
+                            {isAr ? cs.labelAr : cs.label}
+                          </span>
+                          {countdown && countdown !== 'Past' && (
+                            <span style={{ fontSize:11, fontWeight:500, color:'#1B4332', background:'#F0FDF4', padding:'3px 8px', borderRadius:20 }}>
+                              {countdown}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })
+                )}
+              </div>
+
+              {/* Legend */}
+              <div style={{ background:'#fff', border:'0.5px solid #E5E7EB', borderRadius:12, overflow:'hidden', marginBottom:12 }}>
+                <div style={{ padding:'12px 16px', borderBottom:'0.5px solid #E5E7EB' }}>
+                  <div style={{ fontSize:13, fontWeight:500, color:'#111827' }}>{isAr?'أنواع الأحداث':'Event types'}</div>
+                </div>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, padding:'12px 16px' }}>
+                  {LEGEND_ITEMS.map(leg => (
+                    <div key={leg.label} style={{ display:'flex', alignItems:'center', gap:8, fontSize:12, color:'#6B7280' }}>
+                      <div style={{ width:10, height:10, borderRadius:3, background:leg.bg, border:`0.5px solid ${leg.border}`, flexShrink:0 }} />
+                      {isAr ? leg.labelAr : leg.label}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* View only notice */}
+              <div style={{ background:'#FFFBEB', border:'0.5px solid #FDE68A', borderRadius:12, padding:'14px 16px' }}>
+                <div style={{ display:'flex', alignItems:'center', gap:6, fontSize:12, fontWeight:500, color:'#92400E', marginBottom:4 }}>
+                  ℹ {isAr?'عرض فقط':'View only'}
+                </div>
+                <div style={{ fontSize:12, color:'#B45309', lineHeight:1.5 }}>
+                  {isAr
+                    ? 'يتم إنشاء الأحداث من قبل مالك المطعم. تواصل معهم لإضافة أو تغيير الأحداث.'
+                    : "Events are created by your restaurant owner. Contact them to add or change events."}
+                </div>
+              </div>
+
+            </div>
+
+          ) : (
+
+            /* ── MOBILE WEEK VIEW ──────────────────────────────── */
+            <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden', padding:'0 16px 16px' }}>
+
+              {/* Week nav */}
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10, flexShrink:0 }}>
+                <div style={{ fontSize:13, fontWeight:500, color:'#111827' }}>{weekLabel}</div>
+                <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                  <div onClick={()=>setWeekOffset(0)}
+                    style={{ fontSize:11, fontWeight:500, color:'#1B4332', background:'#F0FDF4', border:'0.5px solid #BBF7D0', padding:'4px 10px', borderRadius:20, cursor:'pointer' }}>
+                    {isAr?'اليوم':'Today'}
+                  </div>
+                  <div onClick={()=>setWeekOffset(p=>p-1)}
+                    style={{ width:32, height:32, borderRadius:8, border:'0.5px solid #E5E7EB', background:'#fff', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', color:'#6B7280', fontSize:16 }}>‹</div>
+                  <div onClick={()=>setWeekOffset(p=>p+1)}
+                    style={{ width:32, height:32, borderRadius:8, border:'0.5px solid #E5E7EB', background:'#fff', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', color:'#6B7280', fontSize:16 }}>›</div>
+                </div>
+              </div>
+
+              {calendarGrid}
+
+            </div>
+
+          )}
+        </div>
+
+      ) : (
+
+        /* ── DESKTOP LAYOUT — unchanged ────────────────────────── */
+        <div style={{ height:'100%', overflow:'hidden', padding:'16px 20px', display:'flex', gap:16 }}>
 
           {/* LEFT — week calendar */}
           <div style={{ flex:1, minWidth:0, display:'flex', flexDirection:'column', gap:12 }}>
@@ -177,79 +412,8 @@ export default function BMSchedule() {
               </div>
             </div>
 
-            {/* Calendar grid — horizontal scroll on small screens */}
-            <div style={{ background:'#fff', border:'0.5px solid #E5E7EB', borderRadius:12, overflow:'hidden', flex:1, display:'flex', flexDirection:'column' }}>
-              <div style={{ overflowX:'auto', flex:1, display:'flex', flexDirection:'column' }}>
-              <div style={{ minWidth:600, display:'flex', flexDirection:'column', flex:1 }}>
+            {calendarGrid}
 
-              {/* Day headers */}
-              <div style={{ display:'grid', gridTemplateColumns:'44px repeat(7,1fr)', borderBottom:'0.5px solid #E5E7EB', flexShrink:0 }}>
-                <div />
-                {weekDates.map((d, i) => {
-                  const isToday = d.toISOString().split('T')[0] === todayStr
-                  return (
-                    <div key={d.toISOString().split('T')[0]} style={{ padding:'10px 4px', textAlign:'center' }}>
-                      <div style={{ fontSize:11, fontWeight:500, color:'#9CA3AF', textTransform:'uppercase', letterSpacing:'0.5px' }}>
-                        {isAr ? DAYS_AR[i] : DAYS_EN[i]}
-                      </div>
-                      <div style={{ marginTop:2, display:'flex', alignItems:'center', justifyContent:'center' }}>
-                        {isToday ? (
-                          <div style={{ width:26, height:26, background:'#1B4332', color:'#fff', borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', fontSize:13, fontWeight:500 }}>
-                            {d.getDate()}
-                          </div>
-                        ) : (
-                          <div style={{ fontSize:14, fontWeight:500, color:'#111827' }}>{d.getDate()}</div>
-                        )}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-
-              {/* Time grid */}
-              <div style={{ overflowY:'auto', flex:1 }}>
-                <div style={{ display:'grid', gridTemplateColumns:'44px repeat(7,1fr)' }}>
-                  {HOURS.map((hour, hourIdx) => (
-                    <>
-                      {/* Time label */}
-                      <div key={`lbl-${hourIdx}`} style={{ fontSize:11, color:'#9CA3AF', textAlign:'right', padding:'5px 6px 0', borderRight:'0.5px solid #E5E7EB', borderBottom:'0.5px solid #F3F4F6' }}>
-                        {hour}
-                      </div>
-                      {/* Day cells */}
-                      {weekDates.map((d, dayIdx) => {
-                        const isToday = d.toISOString().split('T')[0] === todayStr
-                        const cellEvents = getEventsAt(dayIdx, hourIdx)
-                        return (
-                          <div key={`cell-${hourIdx}-${dayIdx}`}
-                            style={{ borderRight: dayIdx < 6 ? '0.5px solid #E5E7EB' : 'none', borderBottom:'0.5px solid #F3F4F6', minHeight:50, padding:2, background: isToday ? 'rgba(27,67,50,0.02)' : 'transparent' }}>
-                            {cellEvents.map(ev => {
-                              const cs = getCatStyle(ev.category)
-                              return (
-                                <div key={ev.id}
-                                  onClick={() => setSelectedEv(selectedEv?.id === ev.id ? null : ev)}
-                                  style={{ borderRadius:6, padding:'4px 7px', margin:1, cursor:'pointer', background:cs.bg, color:cs.color, transition:'all 0.15s' }}
-                                  onMouseEnter={e=>e.currentTarget.style.filter='brightness(0.95)'}
-                                  onMouseLeave={e=>e.currentTarget.style.filter='none'}
-                                >
-                                  <div style={{ fontSize:10, fontWeight:500, lineHeight:1.2 }}>
-                                    {isAr ? ev.title_ar || ev.title : ev.title}
-                                  </div>
-                                  {ev.start_time && (
-                                    <div style={{ fontSize:9, opacity:0.7, marginTop:1 }}>{formatTime(ev.start_time)}</div>
-                                  )}
-                                </div>
-                              )
-                            })}
-                          </div>
-                        )
-                      })}
-                    </>
-                  ))}
-                </div>
-              </div>
-            </div>
-            </div>{/* minWidth wrapper */}
-            </div>{/* overflowX scroll wrapper */}
           </div>
 
           {/* RIGHT panel */}
@@ -308,12 +472,7 @@ export default function BMSchedule() {
                 <div style={{ fontSize:13, fontWeight:500, color:'#111827' }}>{isAr?'أنواع الأحداث':'Event types'}</div>
               </div>
               <div style={{ display:'flex', flexDirection:'column', gap:6, padding:'12px 14px' }}>
-                {[
-                  { bg:'#DCFCE7', border:'#166534', label:'Inspection', labelAr:'تفتيش'  },
-                  { bg:'#EDE9FE', border:'#5B21B6', label:'Training',   labelAr:'تدريب'  },
-                  { bg:'#FFEDD5', border:'#9A3412', label:'Safety',     labelAr:'سلامة'  },
-                  { bg:'#F3F4F6', border:'#E5E7EB', label:'Audit',      labelAr:'تدقيق'  },
-                ].map(leg => (
+                {LEGEND_ITEMS.map(leg => (
                   <div key={leg.label} style={{ display:'flex', alignItems:'center', gap:8, fontSize:11, color:'#6B7280' }}>
                     <div style={{ width:10, height:10, borderRadius:3, background:leg.bg, border:`0.5px solid ${leg.border}`, flexShrink:0 }} />
                     {isAr ? leg.labelAr : leg.label}
@@ -335,7 +494,10 @@ export default function BMSchedule() {
             </div>
 
           </div>
-      </div>
+        </div>
+
+      )}
+
     </BMLayout>
   )
 }
