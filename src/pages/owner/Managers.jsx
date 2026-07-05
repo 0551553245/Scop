@@ -275,7 +275,11 @@ export default function OwnerManagers() {
   // Available branches (no manager yet)
   const availableBranches = branches.filter(b => !b.manager_id)
 
-  const atManagerLimit = !!(subscription && managers.length >= subscription.managers_limit)
+  const atManagerLimit = !!(
+    subscription &&
+    subscription.managers_limit != null &&
+    managers.length >= subscription.managers_limit
+  )
 
   const managersTopbarLeft = (
     <div style={{ display:'flex', alignItems:'center', gap:8 }}>
