@@ -44,8 +44,13 @@ export function BranchManagerAuthProvider({ children }) {
       .single()
 
     if (error || !data) {
-      // Network error or profile missing — keep the auth session, just clear the profile
+      await supabaseBranchManager.auth.signOut()
+      setUser(null)
       setProfile(null)
+      setOwnerSubscription(null)
+      _bmProfileCache = null
+      _bmProfileCacheUserId = null
+      setLoading(false)
       return null
     }
 

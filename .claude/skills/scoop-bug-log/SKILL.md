@@ -1629,4 +1629,99 @@ The function uses the service role key server-side to call `auth.admin.createUse
 
 **Rule:** NEVER use `supabaseTemp.auth.signUp()` to create manager accounts from the frontend. Always use the `create-manager` Edge Function. Never rely on DB triggers for critical data — always explicitly insert/upsert from trusted code. `supabaseTemp` is now used ONLY for owner self-registration.
 
-## Bug count: #038 – #147 (110 bugs total)
+## BUG #148 — SECURITY: BranchManagerAuthContext Path B kept session alive when profile row missing
+
+**File:** src/context/BranchManagerAuthContext.jsx
+**Symptom:** If a branch manager's `public.users` row was missing or couldn't be fetched, the Supabase auth session remained alive in `scop-bm-session` storage. `profile` was set to null but `user` stayed set. ProtectedRoute's `!profile` check blocked route access, but the session lingered and caused a confusing login loop.
+**Root cause:** Path B (line 46 `if (error || !data)`) only called `setProfile(null)` — it never called `signOut()`, matching the original BUG #144 pattern in OwnerAuthContext before that was fixed.
+**WRONG:**
+```js
+if (error || !data) {
+  setProfile(null)
+  return null
+}
+```
+**CORRECT:**
+```js
+if (error || !data) {
+  await supabaseBranchManager.auth.signOut()
+  setUser(null)
+  setProfile(null)
+  setOwnerSubscription(null)
+  _bmProfileCache = null
+  _bmProfileCacheUserId = null
+  setLoading(false)
+  return null
+}
+```
+**Rule:** Every auth context's `fetchProfile()` Path B (missing row) MUST call `signOut()` and clear all state — never just setProfile(null). A null profile with a live session is always wrong. This rule applies to OwnerAuthContext, BranchManagerAuthContext, and AdminAuthContext equally.
+
+---
+
+## BUG #149 — SECURITY: AdminAuthContext Path B kept session alive when profile row missing
+
+**File:** src/context/AdminAuthContext.jsx
+**Symptom:** Same issue as BUG #148 — if the admin's `public.users` row was missing, the session stayed alive in `scop-admin-session`. ProtectedRoute blocked route access via `!profile`, but the session was never terminated.
+**Root cause:** Same as BUG #148 — Path B only called `setProfile(null)`.
+**CORRECT:**
+```js
+if (error || !data) {
+  await supabaseAdmin.auth.signOut()
+  setUser(null)
+  setProfile(null)
+  _adminCache = null
+  _adminCacheUserId = null
+  setLoading(false)
+  return null
+}
+```
+**Rule:** See BUG #148.
+
+---
+
+## BUG #150 — MEDIUM: BM Login.jsx had no email_confirmed_at check — unconfirmed accounts got misleading error
+
+**File:** src/pages/branch-manager/Login.jsx
+**Symptom:** If a branch manager account's email was unconfirmed (e.g., created via old signUp() flow before BUG #147 fix), `signInWithPassword()` would return an "Email not confirmed" error from Supabase. BM Login.jsx showed generic "Incorrect email or password" — the same message as a wrong password. Manager had no way to know the real problem.
+**Root cause:** BM Login.jsx had no `email_confirmed_at` check after successful signIn, unlike Owner Login.jsx which has had this check since early in the project.
+**CORRECT (added after `if (authError)` block):**
+```js
+if (!authData.user.email_confirmed_at) {
+  await supabaseBranchManager.auth.signOut()
+  setError(isAr
+    ? 'حسابك غير مفعل. تواصل مع مالك المطعم.'
+    : 'Your account is not activated. Contact your restaurant owner.')
+  setLoading(false)
+  return
+}
+```
+**Rule:** Every Login.jsx MUST check `email_confirmed_at` immediately after `signInWithPassword()` succeeds and show a specific, actionable message — not the generic "incorrect password" error.
+
+---
+
+## BUG #151 — HIGH: Branches.jsx atBranchLimit had same null-coercion bug as BUG #145 (Managers.jsx)
+
+**File:** src/pages/owner/Branches.jsx
+**Symptom:** If `subscription.branches_limit` was null in the DB, `branches.length >= null` → `0 >= 0` → `true` → "+ Add Branch" button permanently disabled and the inline validation guard also blocked branch creation even with zero branches.
+**Root cause:** Same JavaScript null-coercion pattern as BUG #145 — no null guard before the `>=` comparison.
+**Two locations fixed:**
+```js
+// Computed flag (button state):
+// WRONG:
+const atBranchLimit = !!(subscription && branches.length >= subscription.branches_limit)
+// CORRECT:
+const atBranchLimit = !!(
+  subscription &&
+  subscription.branches_limit != null &&
+  branches.length >= subscription.branches_limit
+)
+
+// Inline guard in handleAddBranch:
+// WRONG:
+if (subscription && branches.length >= subscription.branches_limit)
+// CORRECT:
+if (subscription && subscription.branches_limit != null && branches.length >= subscription.branches_limit)
+```
+**Rule:** NEVER compare `x.length >= subscription.branches_limit` or `subscription.managers_limit` without first guarding `!= null`. Apply to every limit check in every file — not just the one first discovered.
+
+## Bug count: #038 – #151 (114 bugs total)

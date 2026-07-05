@@ -94,6 +94,15 @@ export default function BranchManagerLogin() {
         return
       }
 
+      if (!authData.user.email_confirmed_at) {
+        await supabaseBranchManager.auth.signOut()
+        setError(isAr
+          ? 'حسابك غير مفعل. تواصل مع مالك المطعم.'
+          : 'Your account is not activated. Contact your restaurant owner.')
+        setLoading(false)
+        return
+      }
+
       const userId = authData.user.id
 
       // Step 2 — fetch profile from public.users

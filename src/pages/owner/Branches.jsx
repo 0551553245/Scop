@@ -176,7 +176,7 @@ export default function OwnerBranches() {
       return
     }
 
-    if (subscription && branches.length >= subscription.branches_limit) {
+    if (subscription && subscription.branches_limit != null && branches.length >= subscription.branches_limit) {
       setModalErr(isAr
         ? `وصلت إلى الحد الأقصى (${subscription.branches_limit} فروع). قم بالترقية لإضافة المزيد.`
         : `Branch limit reached (${subscription.branches_limit} branches). Upgrade to add more.`)
@@ -223,7 +223,11 @@ export default function OwnerBranches() {
     setModalErr('')
   }
 
-  const atBranchLimit = !!(subscription && branches.length >= subscription.branches_limit)
+  const atBranchLimit = !!(
+    subscription &&
+    subscription.branches_limit != null &&
+    branches.length >= subscription.branches_limit
+  )
 
   const branchesTopbarLeft = (
     <div style={{ display:'flex', alignItems:'center', gap:8 }}>

@@ -26,8 +26,12 @@ export function AdminAuthProvider({ children }) {
       .single()
 
     if (error || !data) {
-      // Network error or profile missing — keep the auth session, just clear the profile
+      await supabaseAdmin.auth.signOut()
+      setUser(null)
       setProfile(null)
+      _adminCache = null
+      _adminCacheUserId = null
+      setLoading(false)
       return null
     }
 
