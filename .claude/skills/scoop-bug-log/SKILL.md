@@ -4,6 +4,18 @@ Every bug ever fixed in Scop. Check this before writing code so you don't repeat
 
 ---
 
+## CRITICAL AUTH RULES — read before touching ANY auth code
+
+1. Every auth context MUST call `signOut()` in Path B (missing profile row) — not just `setProfile(null)`. A live session with no profile is an open door.
+2. Every login page MUST check `email_confirmed_at` after `signInWithPassword()` succeeds. Never show "incorrect password" for an unconfirmed account.
+3. Manager accounts are ONLY created via the `create-manager` Edge Function — NEVER via `supabaseTemp.auth.signUp()`. The service role key is required and lives in the Edge Function only.
+4. `ProtectedRoute` must check BOTH `user` AND `profile` — not just `user`. `!user || !profile` → redirect to login.
+5. Limit checks (`managers_limit`, `branches_limit`) must always guard `!= null` before `>=` or `<=`. JavaScript coerces `null` to `0`, making limit comparisons always true when null.
+6. Trial subscription limits: `branches_limit = 3`, `managers_limit = 5` — never 1/1. Check both INSERT paths (EmailVerify.jsx and useSubscription.js recovery).
+7. `subscriptions` table has a UNIQUE constraint on `owner_id` — always use upsert, never blind insert.
+
+---
+
 ## BUG #038 — CRITICAL: Photos stored as base64 in database
 **Files:** DailyTasks.jsx, WeeklyTasks.jsx, MonthlyTasks.jsx
 **Symptom:** 1 photo = 3–11 MB in DB. Fills free tier in days. Freezes browser.
@@ -1724,4 +1736,82 @@ if (subscription && subscription.branches_limit != null && branches.length >= su
 ```
 **Rule:** NEVER compare `x.length >= subscription.branches_limit` or `subscription.managers_limit` without first guarding `!= null`. Apply to every limit check in every file — not just the one first discovered.
 
-## Bug count: #038 – #151 (114 bugs total)
+## BUG #152 — CRITICAL: Manager creation used signUp() — unconfirmed accounts, broken branch_id, managers couldn't log in
+
+**File:** src/pages/owner/Managers.jsx (replaced with Edge Function call)
+**Symptom:** Branch managers created by owners could not log in. Supabase required email verification, but no verification email was sent to the manager and no instructions shown to the owner. Even if a manager somehow got confirmed, their `public.users` row had `branch_id = null`, causing every BM page to show "subscription expired."
+**Root cause:** The creation flow was three unchained steps with no atomicity:
+1. `supabaseTemp.auth.signUp()` — created an unconfirmed account; relied on a DB trigger to insert the `public.users` row
+2. `supabaseOwner.from('users').update(...)` — silently no-oped if trigger hadn't run yet (update on non-existent row)
+3. `supabaseOwner.from('branches').update({ manager_id })` — assigned branch without confirming user row existed
+
+Result: unconfirmed email (login blocked), `branch_id = null` in `public.users` (subscription check failed), and three separate write operations with no rollback if any step failed.
+
+**WRONG:**
+```js
+// supabaseTemp.auth.signUp() → trigger → update public.users → update branches
+// Three separate operations, unconfirmed email, trigger not guaranteed to run
+```
+
+**CORRECT:**
+```js
+const { data, error } = await supabaseOwner.functions.invoke('create-manager', {
+  body: { email, password, name, nameAr, phone, branchId, ownerId: profile.id }
+})
+// Edge Function: auth.admin.createUser({ email_confirm: true }) + INSERT public.users + UPDATE branches — atomic
+```
+
+**Rule:** Manager accounts MUST be created via the `create-manager` Edge Function only. Never use `supabaseTemp.auth.signUp()` for manager creation — it requires email confirmation and cannot atomically write `public.users`. The anon key cannot call `auth.admin.*`; the service role key lives in the Edge Function only.
+
+---
+
+## BUG #153 — MEDIUM: Trial subscription created with managers_limit=1, branches_limit=1
+
+**Files:** src/pages/owner/EmailVerify.jsx, src/hooks/useSubscription.js
+**Symptom:** New trial owners could only create 1 branch and 1 manager — the same cap as the cheapest paid plan. Trial period was unusable for evaluation. Combined with BUG #145/#151 (null-coercion), an owner with `managers_limit=null` had the button permanently disabled from day one.
+**Root cause:** Two separate INSERT paths both defaulted to `1`:
+- `EmailVerify.jsx`: `branches_limit: pl[plan]?.branches ?? 1` — fallback `?? 1` fired when plan lookup returned undefined
+- `useSubscription.js` recovery insert: hardcoded `branches_limit: 1, managers_limit: 1`
+
+**WRONG:**
+```js
+branches_limit: pl[plan]?.branches ?? 1,
+managers_limit: pl[plan]?.managers ?? 1,
+// recovery insert also: branches_limit: 1, managers_limit: 1
+```
+
+**CORRECT:**
+```js
+branches_limit: 3,
+managers_limit: 5,
+```
+
+**Rule:** Trial plan limits are `branches_limit = 3`, `managers_limit = 5`. Both INSERT paths (primary in EmailVerify.jsx and recovery in useSubscription.js) must use these values. Never use `?? 1` as a fallback for subscription limits.
+
+---
+
+## BUG #154 — HIGH: Duplicate subscription rows caused by double INSERT in registration flow
+
+**File:** src/pages/owner/EmailVerify.jsx (and subscriptions table schema)
+**Symptom:** Some owner accounts had two rows in the `subscriptions` table with the same `owner_id`. `useSubscription` uses `.maybeSingle()` — when two rows exist, Supabase returns an error instead of data, causing the subscription hook to silently return null. The owner's dashboard shows no subscription, `isExpired` defaults to false (no active status match) and `hasAccess` is false.
+**Root cause:** The email verification link can be clicked more than once (e.g., browser back + re-click, or mobile client pre-fetching the URL). Each click runs `completeSetup()`. The `if (!existingSub)` guard in EmailVerify.jsx prevents the second insert, BUT if the first insert was still in-flight when the second click landed, both could proceed past the guard simultaneously. Additionally, some registration paths that bypassed EmailVerify.jsx ran a second INSERT without checking.
+**WRONG:**
+```js
+// Blind INSERT — fails silently or creates duplicate on race condition
+await supabaseOwner.from('subscriptions').insert({ owner_id: userId, ... })
+```
+
+**CORRECT:**
+```js
+// Check first, insert only if missing — AND add UNIQUE constraint to DB
+const { data: existingSub } = await supabaseOwner
+  .from('subscriptions').select('id').eq('owner_id', userId).maybeSingle()
+if (!existingSub) {
+  await supabaseOwner.from('subscriptions').insert({ owner_id: userId, ... })
+}
+// DB-level: ALTER TABLE subscriptions ADD CONSTRAINT subscriptions_owner_id_unique UNIQUE (owner_id);
+```
+
+**Rule:** `subscriptions` table has (or must have) a UNIQUE constraint on `owner_id`. Always check for an existing row before inserting. Prefer upsert over insert for subscription rows. Never assume `completeSetup()` only runs once — email links can be clicked multiple times.
+
+## Bug count: #038 – #154 (117 bugs total)
