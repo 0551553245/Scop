@@ -285,8 +285,8 @@ export default function OwnerManagers() {
     <OwnerLayout activePath="/owner/managers" title="Managers" titleAr="المديرون"
       topbarLeft={managersTopbarLeft} topbarRight={managersTopbarRight}>
       <div style={{ padding:'20px 24px' }}>
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:14 }}>
-          {['a','b','c','d','e','f'].map(k => <div key={k} className="skeleton" style={{ height:160 }} />)}
+        <div style={{ display:'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3,1fr)', gap: isMobile ? 8 : 14 }}>
+          {['a','b','c','d','e','f'].map(k => <div key={k} className="skeleton" style={{ height: isMobile ? 68 : 160 }} />)}
         </div>
       </div>
     </OwnerLayout>
@@ -330,13 +330,51 @@ export default function OwnerManagers() {
               </SubscriptionGuard>
             </div>
           ) : (
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:12 }}>
+            <div style={{ display:'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3,1fr)', gap: isMobile ? 8 : 12 }}>
               {managers.map(mgr => {
                 const p     = perfMap[mgr.id] || {}
                 const score = p.score ?? null
                 const color = getColor(mgr.name)
                 const init  = getInitials(mgr.name)
                 const bName = isAr ? mgr.branch?.name_ar || mgr.branch?.name : mgr.branch?.name
+
+                if (isMobile) return (
+                  <div key={mgr.id}
+                    style={{ background:'#fff', border:'1px solid #E5E7EB', borderRadius:14, padding:'12px 14px', display:'flex', alignItems:'center', gap:12 }}
+                  >
+                    {/* Avatar */}
+                    <div style={{ width:44, height:44, borderRadius:12, background:color, display:'flex', alignItems:'center', justifyContent:'center', fontSize:14, fontWeight:800, color:'#fff', flexShrink:0, position:'relative' }}>
+                      {init}
+                      <div style={{ position:'absolute', bottom:-2, right:-2, width:10, height:10, borderRadius:'50%', border:'2px solid #fff', background: mgr.is_active ? '#10B981' : '#D1D5DB' }} />
+                    </div>
+
+                    {/* Info */}
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ fontSize:13, fontWeight:700, color:'#111827', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                        {isAr ? mgr.name_ar || mgr.name : mgr.name}
+                      </div>
+                      <div style={{ fontSize:11, color:'#9CA3AF', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{mgr.email}</div>
+                      {bName && (
+                        <div style={{ display:'inline-flex', alignItems:'center', gap:4, background:'#F0FDF4', color:'#166534', fontSize:10, fontWeight:600, padding:'3px 8px', borderRadius:20, marginTop:4 }}>
+                          🏪 {bName}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Performance */}
+                    <div style={{ flexShrink:0, textAlign:'right', minWidth:52 }}>
+                      <div style={{ fontSize:18, fontWeight:800, letterSpacing:'-0.5px', color: score !== null ? perfColor(score) : '#D1D5DB' }}>
+                        {score !== null ? score : '—'}
+                      </div>
+                      <div style={{ height:4, background:'#F3F4F6', borderRadius:20, overflow:'hidden', width:52, marginTop:4 }}>
+                        <div style={{ height:'100%', width:`${score ?? 0}%`, background: score !== null ? perfColor(score) : '#E5E7EB', borderRadius:20 }} />
+                      </div>
+                      {score === null && (
+                        <div style={{ fontSize:9, color:'#9CA3AF', marginTop:4 }}>{isAr?'لا بيانات':'No data'}</div>
+                      )}
+                    </div>
+                  </div>
+                )
 
                 return (
                   <div key={mgr.id}
