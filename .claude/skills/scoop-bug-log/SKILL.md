@@ -1592,4 +1592,41 @@ managers_limit: 5,
 
 **Rule:** Trial subscriptions must have generous limits (branches=3, managers=5) so owners can properly evaluate the product. Never set trial limits equal to the entry paid plan limits. Both the primary INSERT path (EmailVerify.jsx) and the recovery INSERT path (useSubscription.js) must use the same trial limits.
 
-## Bug count: #038 – #146 (109 bugs total)
+## BUG #147 — CRITICAL: Manager creation flow used signUp() + unreliable DB trigger — pre-confirmed accounts never created
+
+**File:** src/pages/owner/Managers.jsx
+**Symptom:** Branch managers could not log in after being created by an owner. Email verification was required but never explained. `public.users` row was missing or had null `branch_id` because the DB trigger either didn't fire or silently failed. The `supabaseTemp.auth.signUp()` call also left the manager's email unconfirmed, blocking login entirely.
+**Root cause:** The creation flow had three separate steps chained with no atomicity guarantee:
+1. `supabaseTemp.auth.signUp()` — relied on a DB trigger to create `public.users` (trigger not guaranteed to run, and failure was silent via `EXCEPTION WHEN OTHERS THEN RETURN new`)
+2. `supabaseOwner.from('users').update(...)` — silently did nothing if trigger hadn't created the row yet
+3. `supabaseOwner.from('branches').update({ manager_id })` — set branch assignment without confirming user row existed
+
+Managers created this way: had unconfirmed email (blocked login), missing/null `branch_id` in `public.users` (caused "subscription expired" on BM panel), and relied on a trigger that was never guaranteed to execute.
+
+**WRONG:**
+```js
+// supabaseTemp.auth.signUp() + DB trigger + update + branch assignment
+// Brittle, 3 separate operations, no atomicity, email unconfirmed
+```
+
+**CORRECT:**
+```js
+// Single Edge Function call — atomic, pre-confirmed, reliable
+const { data, error } = await supabaseOwner.functions.invoke(
+  'create-manager',
+  {
+    body: {
+      email, password, name, nameAr, phone, branchId, ownerId
+    },
+  }
+)
+```
+
+**Edge Function URL:** `https://bjjpcawqkwufttjabuol.supabase.co/functions/v1/create-manager`
+**Edge Function accepts:** `{ email, password, name, nameAr, phone, branchId, ownerId }`
+**Edge Function returns:** `{ user }` on success, `{ error }` on failure.
+The function uses the service role key server-side to call `auth.admin.createUser({ email_confirm: true })` and atomically inserts the `public.users` row and updates `branches.manager_id`.
+
+**Rule:** NEVER use `supabaseTemp.auth.signUp()` to create manager accounts from the frontend. Always use the `create-manager` Edge Function. Never rely on DB triggers for critical data — always explicitly insert/upsert from trusted code. `supabaseTemp` is now used ONLY for owner self-registration.
+
+## Bug count: #038 – #147 (110 bugs total)

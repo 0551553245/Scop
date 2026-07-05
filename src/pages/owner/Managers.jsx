@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useIsMobile } from '../../hooks/useIsMobile'
 import { Link } from 'react-router-dom'
-import { supabaseOwner, supabaseTemp } from '../../lib/supabase'
+import { supabaseOwner } from '../../lib/supabase'
 import { useOwnerAuth } from '../../context/OwnerAuthContext'
 import { getExpectedForBranch, calcRate } from '../../lib/stats'
 import { useSubscription } from '../../hooks/useSubscription'
@@ -189,72 +189,35 @@ export default function OwnerManagers() {
     setModalSaving(true)
 
     try {
-      // Step 1 — create auth account for manager
-      // Trigger will auto-create public.users row with role = branch_manager
-      const { data: authData, error: authErr } = await supabaseTemp.auth.signUp({
-        email:    mEmail.trim(),
-        password: mPassword,
-        options: {
-          data: {
-            role:      'branch_manager',
-            name:      mName.trim(),
-            branch_id: mBranchId,
+      const { data, error } = await supabaseOwner.functions.invoke(
+        'create-manager',
+        {
+          body: {
+            email:    mEmail.trim(),
+            password: mPassword,
+            name:     mName.trim(),
+            nameAr:   mNameAr.trim() || mName.trim(),
+            phone:    mPhone.trim() || null,
+            branchId: mBranchId,
+            ownerId:  profile.id,
           },
-        },
-      })
-
-      if (authErr) {
-        if (authErr.message?.toLowerCase().includes('already')) {
-          setModalErr(isAr ? 'البريد الإلكتروني مستخدم بالفعل' : 'Email already in use.')
-        } else {
-          setModalErr(authErr.message || (isAr ? 'حدث خطأ' : 'Something went wrong.'))
         }
-        setModalSaving(false)
-        return
-      }
-
-      const managerId = authData.user?.id
-      if (!managerId) {
-        setModalErr(isAr ? 'حدث خطأ أثناء إنشاء الحساب' : 'Failed to create account.')
-        setModalSaving(false)
-        return
-      }
-
-      // Step 2 — update public.users with phone and name_ar if provided
-      await supabaseOwner
-        .from('users')
-        .update({
-          name_ar:   mNameAr.trim() || mName.trim(),
-          phone:     mPhone.trim()  || null,
-          branch_id: mBranchId,
-        })
-        .eq('id', managerId)
-
-      // Step 3 — assign manager to branch
-      const { error: branchErr } = await supabaseOwner
-        .from('branches')
-        .update({ manager_id: managerId })
-        .eq('id', mBranchId)
-        .eq('owner_id', profile.id) // security: only update own branches
-
-      if (branchErr) {
-        setModalErr(isAr
-          ? 'تم إنشاء حساب المدير لكن فشل تعيينه للفرع. تواصل مع الدعم إذا استمرت المشكلة.'
-          : 'Manager account created but branch assignment failed. Contact support if the issue persists.')
-        setModalSaving(false)
-        return
-      }
-
-      // Success
-      setModalSuccess(isAr
-        ? `تم إنشاء حساب ${mName} بنجاح وتعيينه في ${branch?.name}`
-        : `${mName}'s account created and assigned to ${branch?.name}.`
       )
 
-      // Reset form
+      if (error || data?.error) {
+        const msg = data?.error || error?.message || 'Failed to create manager'
+        if (msg.includes('already registered') || msg.includes('already been registered')) {
+          setModalErr(isAr ? 'هذا البريد الإلكتروني مسجل بالفعل' : 'This email is already registered')
+        } else {
+          setModalErr(isAr ? 'حدث خطأ أثناء إنشاء الحساب' : msg)
+        }
+        return
+      }
+
+      // Success — reset form and refresh list
       setMName(''); setMNameAr(''); setMEmail('')
       setMPhone(''); setMPassword(''); setMBranchId('')
-
+      setModalSuccess(isAr ? 'تم إضافة المدير بنجاح' : 'Manager added successfully')
       await fetchData()
 
     } catch (err) {
