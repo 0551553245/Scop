@@ -1542,4 +1542,54 @@ return <Outlet />
 
 **Rule:** `ProtectedRoute` MUST always check both `user` AND `profile` before rendering `<Outlet />`. Any auth context code path that results in `profile = null` MUST also call `signOut()` immediately — a null profile with a live session is an open door. Path B (missing row) must be treated identically to Path A (wrong role): sign out, clear all state, return null.
 
-## Bug count: #038 – #144 (107 bugs total)
+## BUG #145 — HIGH: atManagerLimit JavaScript null-coercion permanently disabled "+ Add Manager" button
+
+**File:** src/pages/owner/Managers.jsx
+**Symptom:** The "+ Add Manager" button did nothing when clicked — the modal never opened — even when the subscription was valid (status='trial') and the owner had zero managers. Button appeared grayed out (#9CA3AF) with `cursor: not-allowed`.
+**Root cause:** `subscription.managers_limit` was `null` in the database row (column not set during a manual or admin-created subscription insert). JavaScript coerces `null` to `0` in numeric comparisons: `managers.length >= null` → `0 >= 0` → `true`. So `atManagerLimit` was permanently `true` regardless of how many managers existed.
+
+**WRONG:**
+```js
+const atManagerLimit = !!(subscription && managers.length >= subscription.managers_limit)
+// When managers_limit = null: 0 >= null → 0 >= 0 → true → button always disabled
+```
+
+**CORRECT:**
+```js
+const atManagerLimit = !!(
+  subscription &&
+  subscription.managers_limit != null &&
+  managers.length >= subscription.managers_limit
+)
+```
+
+**Rule:** NEVER compare `managers.length >= subscription.managers_limit` without first guarding against null. JavaScript coerces null to 0 in numeric comparisons. Always add `subscription.managers_limit != null &&` before the comparison. This applies to `branches_limit` checks everywhere too.
+
+---
+
+## BUG #146 — MEDIUM: Trial subscription created with managers_limit=1, branches_limit=1 — owners couldn't add managers or branches during trial
+
+**Files:** src/pages/owner/EmailVerify.jsx, src/hooks/useSubscription.js
+**Symptom:** New owners on trial could only create 1 branch and 1 manager — identical to the cheapest paid plan, defeating the purpose of a trial period. Combined with BUG #145 (null coercion), any subscription without `managers_limit` set would completely block the button.
+**Root cause:** Two INSERT paths both used the value `1`:
+- EmailVerify.jsx: `branches_limit: pl[plan]?.branches ?? 1` and `managers_limit: pl[plan]?.managers ?? 1` — the fallback `?? 1` was used when the plan lookup returned undefined (e.g. plan='starter' on a fresh platformSettings table).
+- useSubscription.js recovery insert: hardcoded `branches_limit: 1, managers_limit: 1`.
+
+**WRONG (both files):**
+```js
+branches_limit: pl[plan]?.branches ?? 1,
+managers_limit: pl[plan]?.managers ?? 1,
+// and in recovery:
+branches_limit: 1,
+managers_limit: 1,
+```
+
+**CORRECT (both files):**
+```js
+branches_limit: 3,
+managers_limit: 5,
+```
+
+**Rule:** Trial subscriptions must have generous limits (branches=3, managers=5) so owners can properly evaluate the product. Never set trial limits equal to the entry paid plan limits. Both the primary INSERT path (EmailVerify.jsx) and the recovery INSERT path (useSubscription.js) must use the same trial limits.
+
+## Bug count: #038 – #146 (109 bugs total)
