@@ -9,6 +9,7 @@ import { useSubscription } from '../../hooks/useSubscription'
 import SubscriptionGuard from '../../components/SubscriptionGuard'
 import NotificationBell from '../../components/NotificationBell'
 import OwnerLayout from '../../components/OwnerLayout'
+import ErrorBanner from '../../components/ErrorBanner'
 import { getCached, setCached, invalidateCache } from '../../lib/cache'
 
 function getHealthScore(taskPct, fsPct) {
@@ -303,9 +304,7 @@ export default function OwnerBranches() {
       <div style={{ padding:'20px 24px' }}>
 
           {/* Error */}
-          {error && (
-            <div style={{ background:'#FFF1F2', border:'1px solid #FECDD3', borderRadius:12, padding:'12px 16px', marginBottom:16, color:'#9F1239', fontSize:13 }}>{error}</div>
-          )}
+          <ErrorBanner message={error} isAr={isAr} />
 
           {/* Alert banner — branches at risk */}
           {atRisk.length > 0 && (

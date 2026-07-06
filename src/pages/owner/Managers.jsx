@@ -9,6 +9,7 @@ import SubscriptionGuard from '../../components/SubscriptionGuard'
 import NotificationBell from '../../components/NotificationBell'
 import { useLanguage } from '../../context/LanguageContext'
 import OwnerLayout from '../../components/OwnerLayout'
+import ErrorBanner from '../../components/ErrorBanner'
 
 const AVATAR_COLORS = ['#1B4332','#3B82F6','#7C3AED','#F59E0B','#EF4444','#0891B2','#059669','#DC2626']
 
@@ -299,12 +300,7 @@ export default function OwnerManagers() {
       {/* Content */}
       <div style={{ padding:'20px 24px' }}>
 
-          {error && (
-            <div style={{ background:'#FFF1F2', border:'1px solid #FECDD3', borderRadius:12, padding:'12px 16px', marginBottom:16, color:'#9F1239', fontSize:13, display:'flex', alignItems:'center', justifyContent:'space-between', gap:12 }}>
-              <span>{error}</span>
-              <button onClick={fetchData} style={{ background:'none', border:'1px solid #FECDD3', borderRadius:8, padding:'4px 10px', color:'#9F1239', fontSize:12, cursor:'pointer', flexShrink:0 }}>{isAr?'إعادة المحاولة':'Retry'}</button>
-            </div>
-          )}
+          <ErrorBanner message={error} isAr={isAr} onRetry={fetchData} />
 
           {/* No branches warning */}
           {branches.length === 0 && (

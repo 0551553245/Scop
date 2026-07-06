@@ -7,6 +7,7 @@ import { getTotalExpected, getExpectedForBranch, calcRate } from '../../lib/stat
 import { useLanguage } from '../../context/LanguageContext'
 import NotificationBell from '../../components/NotificationBell'
 import OwnerLayout from '../../components/OwnerLayout'
+import ErrorBanner from '../../components/ErrorBanner'
 import { getWeekStartStr } from '../../lib/weekUtils'
 import { getCached, setCached } from '../../lib/cache'
 
@@ -428,14 +429,7 @@ export default function OwnerReports() {
       <div style={{ padding: isMobile ? '16px' : '20px 24px' }}>
 
           {/* Error banner */}
-          {error && (
-            <div style={{ marginBottom: 16, padding: '10px 16px', background: '#FFF1F2', border: '1px solid #FECDD3', borderRadius: 10, fontSize: 13, color: '#E24B4A', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              {error}
-              <button onClick={fetchData} style={{ fontSize: 12, color: '#E24B4A', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700 }}>
-                {isAr ? 'إعادة' : 'Retry'}
-              </button>
-            </div>
-          )}
+          <ErrorBanner message={error} isAr={isAr} onRetry={fetchData} />
 
           {/* Empty state */}
           {branches.length === 0 ? (
