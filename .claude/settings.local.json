@@ -12,7 +12,8 @@
       "Bash(grep -v \"^$\")",
       "Read(//tmp/**)",
       "Bash(awk -F: '{sum+=$2} END {print \"total console calls:\", sum}')",
-      "Bash(grep *)"
+      "Bash(grep *)",
+      "Bash(awk *)"
     ]
   }
 }
