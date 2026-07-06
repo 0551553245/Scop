@@ -10,11 +10,9 @@ import OwnerLayout from '../../components/OwnerLayout'
 
 const TEMPLATES = [
   { icon:'🧊', name:'Fridge 1',              nameAr:'ثلاجة 1',            type:'temperature', minTemp:2,   maxTemp:8,    unit:'°C' },
-  { icon:'🧊', name:'Fridge 2',              nameAr:'ثلاجة 2',            type:'temperature', minTemp:2,   maxTemp:8,    unit:'°C' },
   { icon:'❄️', name:'Freezer 1',             nameAr:'مجمد 1',             type:'temperature', minTemp:null,maxTemp:-18,  unit:'°C' },
   { icon:'🔥', name:'Hot Counter',           nameAr:'كاونتر ساخن',        type:'temperature', minTemp:60,  maxTemp:null, unit:'°C' },
   { icon:'⚖️', name:'Portion Weight Check',  nameAr:'فحص وزن الحصة',      type:'weight',      minTemp:null,maxTemp:null, unit:'kg' },
-  { icon:'⚖️', name:'Delivery Weight Check', nameAr:'فحص وزن التوصيل',    type:'weight',      minTemp:null,maxTemp:null, unit:'kg' },
   { icon:'📦', name:'Food Storage Check',    nameAr:'فحص تخزين الغذاء',   type:'compliance',  minTemp:null,maxTemp:null, unit:null },
   { icon:'✏️', name:'',                      nameAr:'',                    type:'temperature', minTemp:null,maxTemp:null, unit:'°C' },
 ]
