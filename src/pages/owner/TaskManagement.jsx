@@ -12,7 +12,7 @@ import OwnerLayout from '../../components/OwnerLayout'
 const TEMPLATES = [
   { icon:'🌅', name:'Opening Checklist',  nameAr:'قائمة الافتتاح',    freq:'daily',   category:'opening'     },
   { icon:'🌙', name:'Closing Checklist',  nameAr:'قائمة الإغلاق',     freq:'daily',   category:'closing'     },
-  { icon:'🛡', name:'Food Safety Check',  nameAr:'فحص سلامة الغذاء',  freq:'daily',   category:'safety'      },
+  { icon:'🛡', name:'Food Storage Check', nameAr:'فحص تخزين الطعام',  freq:'daily',   category:'safety'      },
   { icon:'🧹', name:'Deep Cleaning',      nameAr:'تنظيف عميق',        freq:'weekly',  category:'cleaning'    },
   { icon:'🔧', name:'Maintenance Check',  nameAr:'فحص الصيانة',       freq:'monthly', category:'maintenance' },
   { icon:'✏️', name:'',                   nameAr:'',                   freq:'daily',   category:'custom'      },
@@ -23,45 +23,6 @@ const FREQ_COLORS = {
   weekly:  { bg:'#F5F3FF', color:'#6D28D9', label:'Weekly',  labelAr:'أسبوعي' },
   monthly: { bg:'#FFF7ED', color:'#C2410C', label:'Monthly', labelAr:'شهري'   },
 }
-
-const BUNDLES = [
-  {
-    key:'opening', icon:'🌅', label:'Opening', labelAr:'الافتتاح', color:'#1D4ED8', bg:'#EFF6FF',
-    tasks:[
-      { name:'Opening Checklist',     nameAr:'قائمة الافتتاح',           category:'opening' },
-      { name:'Staff Uniform Check',   nameAr:'فحص زي الموظفين',          category:'opening' },
-      { name:'Cash Register Check',   nameAr:'فحص الكاشير',              category:'opening' },
-      { name:'Lights & AC Check',     nameAr:'فحص الإضاءة والتكييف',    category:'opening' },
-      { name:'Doors & Windows Check', nameAr:'فحص الأبواب والنوافذ',    category:'opening' },
-    ],
-  },
-  {
-    key:'closing', icon:'🌙', label:'Closing', labelAr:'الإغلاق', color:'#065F46', bg:'#ECFDF5',
-    tasks:[
-      { name:'Closing Checklist',     nameAr:'قائمة الإغلاق',            category:'closing' },
-      { name:'Cash Count & Deposit',  nameAr:'عد النقود والإيداع',       category:'closing' },
-      { name:'Kitchen Deep Clean Check', nameAr:'فحص التنظيف العميق للمطبخ', category:'closing' },
-      { name:'Security & Lock Check', nameAr:'فحص الأمن والأقفال',      category:'closing' },
-    ],
-  },
-  {
-    key:'food_safety', icon:'🌡', label:'Food Safety', labelAr:'سلامة الغذاء', color:'#C2410C', bg:'#FFF7ED',
-    tasks:[
-      { name:'Fridge Temperature Check',      nameAr:'قياس حرارة الثلاجة',         category:'food_safety', requires_value:true },
-      { name:'Freezer Temperature Check',     nameAr:'قياس حرارة الفريزر',         category:'food_safety', requires_value:true },
-      { name:'Hot Counter Temperature Check', nameAr:'قياس حرارة الكاونتر الساخن', category:'food_safety', requires_value:true },
-      { name:'Food Storage Check',            nameAr:'فحص تخزين الطعام',           category:'food_safety', requires_photo:true },
-    ],
-  },
-  {
-    key:'cleaning', icon:'🧹', label:'Cleaning', labelAr:'التنظيف', color:'#9D174D', bg:'#FDF2F8',
-    tasks:[
-      { name:'Kitchen Cleaning',        nameAr:'تنظيف المطبخ',             category:'cleaning', requires_photo:true },
-      { name:'Bathroom Cleaning',       nameAr:'تنظيف دورات المياه',       category:'cleaning', requires_photo:true },
-      { name:'Floor & Tables Cleaning', nameAr:'تنظيف الأرضيات والطاولات', category:'cleaning', requires_photo:true },
-    ],
-  },
-]
 
 const CATEGORY_ORDER = ['opening', 'food_safety', 'cleaning', 'maintenance', 'closing', 'custom']
 const CAT_META = {
@@ -104,9 +65,6 @@ export default function OwnerTaskManagement() {
   const [saving,       setSaving]       = useState(false)
   const [saveErr,      setSaveErr]      = useState('')
   const [saveOk,       setSaveOk]       = useState('')
-  const [activeBundle,  setActiveBundle]  = useState(null)
-  const [bundleSaving,  setBundleSaving]  = useState(false)
-  const [bundleSaveErr, setBundleSaveErr] = useState('')
 
   // ── FETCH ─────────────────────────────────────────────────
   const fetchData = useCallback(async () => {
@@ -296,40 +254,6 @@ export default function OwnerTaskManagement() {
     }
   }
 
-  // ── BUNDLE SAVE ──────────────────────────────────────────
-  async function handleBundleSave() {
-    if (!activeBundle || bundleSaving) return
-    setBundleSaveErr('')
-    setBundleSaving(true)
-    try {
-      const bundle = BUNDLES.find(b => b.key === activeBundle)
-      const inserts = bundle.tasks.map(t => ({
-        name:           t.name,
-        name_ar:        t.nameAr || t.name,
-        frequency:      'daily',
-        branch_id:      null,
-        category:       t.category || 'custom',
-        requires_photo: t.requires_photo || false,
-        requires_note:  false,
-        requires_value: t.requires_value || false,
-        value_unit:     t.requires_value ? '°C' : null,
-        is_active:      true,
-        created_by:     profile.id,
-      }))
-      const { error: insErr } = await supabaseOwner.from('tasks').insert(inserts)
-      if (insErr) throw insErr
-      setActiveBundle(null)
-      const today = new Date().toISOString().split('T')[0]
-      invalidateCache(`owner-tasks-${profile.id}-${today}`)
-      await fetchData()
-    } catch (err) {
-      console.error('Bundle save error:', err)
-      setBundleSaveErr(isAr ? 'فشل الحفظ. حاول مرة أخرى.' : 'Save failed. Please try again.')
-    } finally {
-      setBundleSaving(false)
-    }
-  }
-
   const isUrl = (url) => url && (url.startsWith('http://') || url.startsWith('https://'))
 
   // ── FILTERED TASKS ────────────────────────────────────────
@@ -382,8 +306,6 @@ export default function OwnerTaskManagement() {
     color:'#111827', fontFamily:'inherit', background:'#fff',
     boxSizing:'border-box', transition:'border-color 0.15s',
   }
-
-  const selectedBundle = BUNDLES.find(b => b.key === activeBundle) ?? null
 
   if (loading) return (
     <OwnerLayout activePath="/owner/tasks" title="Task Management" titleAr="إدارة المهام"
@@ -691,62 +613,27 @@ export default function OwnerTaskManagement() {
             <div style={{ fontSize:15, fontWeight:700, color:'#111827', marginBottom:4 }}>{isAr?'مهمة جديدة':'New Task'}</div>
             <div style={{ fontSize:11, color:'#9CA3AF', marginBottom:20 }}>{isAr?'اختر قالباً أو اكتب مهمتك':'Pick a template or write your own'}</div>
 
-            {/* Bundles */}
+            {/* Templates */}
             <div style={{ fontSize:10, fontWeight:700, color:'#9CA3AF', textTransform:'uppercase', letterSpacing:'0.8px', marginBottom:8 }}>
-              {isAr ? 'حزم جاهزة' : 'Quick bundles'}
+              {isAr?'بداية سريعة':'Quick start'}
             </div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:12 }}>
-              {BUNDLES.map(bundle => {
-                const isOn = activeBundle === bundle.key
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:6, marginBottom:6 }}>
+              {TEMPLATES.map((tpl, idx) => {
+                const isOn = tplIdx === idx
                 return (
-                  <div key={bundle.key}
-                    onClick={() => { setBundleSaveErr(''); setActiveBundle(prev => prev === bundle.key ? null : bundle.key) }}
-                    style={{ borderRadius:12, border:`1.5px solid ${isOn ? bundle.color : '#E5E7EB'}`, background: isOn ? bundle.bg : '#F9FAFB', cursor:'pointer', padding:'12px 8px', textAlign:'center', transition:'all 0.15s' }}
-                    onMouseEnter={e=>{if(!isOn){e.currentTarget.style.borderColor='#D1D5DB';e.currentTarget.style.background='#F3F4F6'}}}
+                  <div key={tpl.name || idx} onClick={()=>pickTemplate(idx)}
+                    style={{ borderRadius:12, border:`1.5px solid ${isOn?'#1B4332':'#E5E7EB'}`, background:isOn?'#F0FDF4':'#F9FAFB', cursor:'pointer', padding:'10px 6px', textAlign:'center', transition:'all 0.15s' }}
+                    onMouseEnter={e=>{if(!isOn){e.currentTarget.style.borderColor='#BBF7D0';e.currentTarget.style.background='#F0FDF4'}}}
                     onMouseLeave={e=>{if(!isOn){e.currentTarget.style.borderColor='#E5E7EB';e.currentTarget.style.background='#F9FAFB'}}}
                   >
-                    <span style={{ fontSize:22, display:'block', marginBottom:4 }}>{bundle.icon}</span>
-                    <div style={{ fontSize:11, fontWeight:700, color: isOn ? bundle.color : '#374151' }}>
-                      {isAr ? bundle.labelAr : bundle.label}
-                    </div>
-                    <div style={{ fontSize:10, color:'#9CA3AF', marginTop:2 }}>
-                      {bundle.tasks.length} {isAr ? 'مهام' : 'tasks'}
+                    <span style={{ fontSize:22, display:'block', marginBottom:4 }}>{tpl.icon}</span>
+                    <div style={{ fontSize:11, fontWeight:700, color:isOn?'#1B4332':'#374151' }}>
+                      {idx === 5 ? (isAr?'مخصص':'Custom') : isAr ? tpl.nameAr.split(' ')[0] : tpl.name.split(' ')[0]}
                     </div>
                   </div>
                 )
               })}
             </div>
-
-            {/* Bundle preview */}
-            {selectedBundle && (
-              <div style={{ background:'#F0FDF4', border:'1px solid #BBF7D0', borderRadius:12, padding:'12px 14px', marginBottom:12 }}>
-                <div style={{ fontSize:12, fontWeight:700, color:'#111827', marginBottom:8 }}>
-                  {isAr ? `${selectedBundle.tasks.length} مهام ستُضاف لجميع الفروع:` : `${selectedBundle.tasks.length} tasks — all branches:`}
-                </div>
-                <div style={{ display:'flex', flexDirection:'column', gap:5, marginBottom:12 }}>
-                  {selectedBundle.tasks.map(t => (
-                    <div key={t.name} style={{ display:'flex', alignItems:'center', gap:6, fontSize:12, color:'#374151' }}>
-                      <span style={{ color:'#1B4332', flexShrink:0 }}>·</span>
-                      <span style={{ flex:1 }}>{isAr ? t.nameAr : t.name}</span>
-                      {t.requires_value && <span style={{ fontSize:10 }}>🌡</span>}
-                      {t.requires_photo && <span style={{ fontSize:10 }}>📷</span>}
-                    </div>
-                  ))}
-                </div>
-                {bundleSaveErr && (
-                  <div style={{ fontSize:11, color:'#9F1239', marginBottom:8 }}>{bundleSaveErr}</div>
-                )}
-                <SubscriptionGuard isExpired={isExpired} isAr={isAr}>
-                  <button type="button" onClick={handleBundleSave} disabled={bundleSaving}
-                    style={{ width:'100%', padding:'10px', background: bundleSaving ? '#6B9E83' : '#1B4332', color:'#fff', border:'none', borderRadius:10, fontSize:13, fontWeight:700, cursor: bundleSaving ? 'not-allowed' : 'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
-                    {bundleSaving && <div style={{ width:12, height:12, border:'2px solid rgba(255,255,255,0.3)', borderTopColor:'#fff', borderRadius:'50%', animation:'spin 0.8s linear infinite' }} />}
-                    {bundleSaving
-                      ? (isAr ? 'جارٍ الحفظ…' : 'Saving…')
-                      : (isAr ? `إضافة ${selectedBundle.tasks.length} مهام` : `Add all ${selectedBundle.tasks.length} tasks`)}
-                  </button>
-                </SubscriptionGuard>
-              </div>
-            )}
 
             {/* OR divider */}
             <div style={{ display:'flex', alignItems:'center', gap:8, margin:'14px 0' }}>
