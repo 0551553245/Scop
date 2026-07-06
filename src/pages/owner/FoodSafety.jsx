@@ -9,15 +9,18 @@ import SubscriptionGuard from '../../components/SubscriptionGuard'
 import OwnerLayout from '../../components/OwnerLayout'
 
 const TEMPLATES = [
-  { icon:'🧊', name:'Fridge 1',         nameAr:'ثلاجة 1',         type:'temp', minTemp:2,   maxTemp:8   },
-  { icon:'🧊', name:'Fridge 2',         nameAr:'ثلاجة 2',         type:'temp', minTemp:2,   maxTemp:8   },
-  { icon:'❄️', name:'Freezer 1',        nameAr:'مجمد 1',          type:'temp', minTemp:null,maxTemp:-18 },
-  { icon:'🔥', name:'Hot Counter',      nameAr:'كاونتر ساخن',     type:'temp', minTemp:60,  maxTemp:null},
-  { icon:'📦', name:'Food Storage Check',nameAr:'فحص تخزين الغذاء',type:'compliance', minTemp:null, maxTemp:null },
-  { icon:'✏️', name:'',                 nameAr:'',                 type:'temp', minTemp:null,maxTemp:null },
+  { icon:'🧊', name:'Fridge 1',              nameAr:'ثلاجة 1',            type:'temperature', minTemp:2,   maxTemp:8,    unit:'°C' },
+  { icon:'🧊', name:'Fridge 2',              nameAr:'ثلاجة 2',            type:'temperature', minTemp:2,   maxTemp:8,    unit:'°C' },
+  { icon:'❄️', name:'Freezer 1',             nameAr:'مجمد 1',             type:'temperature', minTemp:null,maxTemp:-18,  unit:'°C' },
+  { icon:'🔥', name:'Hot Counter',           nameAr:'كاونتر ساخن',        type:'temperature', minTemp:60,  maxTemp:null, unit:'°C' },
+  { icon:'⚖️', name:'Portion Weight Check',  nameAr:'فحص وزن الحصة',      type:'weight',      minTemp:null,maxTemp:null, unit:'kg' },
+  { icon:'⚖️', name:'Delivery Weight Check', nameAr:'فحص وزن التوصيل',    type:'weight',      minTemp:null,maxTemp:null, unit:'kg' },
+  { icon:'📦', name:'Food Storage Check',    nameAr:'فحص تخزين الغذاء',   type:'compliance',  minTemp:null,maxTemp:null, unit:null },
+  { icon:'✏️', name:'',                      nameAr:'',                    type:'temperature', minTemp:null,maxTemp:null, unit:'°C' },
 ]
 
-function getIcon(name) {
+function getIcon(name, type) {
+  if (type === 'weight') return { icon:'⚖️', bg:'#FFFBEB' }
   const n = (name || '').toLowerCase()
   if (n.includes('fridge') || n.includes('ثلاجة')) return { icon:'🧊', bg:'#EFF6FF' }
   if (n.includes('freezer') || n.includes('مجمد')) return { icon:'❄️', bg:'#EFF6FF' }
@@ -27,10 +30,18 @@ function getIcon(name) {
 }
 
 function getRangeLabel(std, isAr) {
-  if (std.min_temp !== null && std.max_temp !== null) return isAr ? `${std.min_temp}°م – ${std.max_temp}°م` : `${std.min_temp}°C – ${std.max_temp}°C`
-  if (std.min_temp !== null) return isAr ? `فوق ${std.min_temp}°م` : `Above ${std.min_temp}°C`
-  if (std.max_temp !== null) return isAr ? `تحت ${std.max_temp}°م` : `Below ${std.max_temp}°C`
+  const unit   = std.standard_type === 'weight' ? (std.unit || 'kg') : '°C'
+  const unitAr = std.standard_type === 'weight' ? (std.unit === 'g' ? 'جم' : 'كجم') : '°م'
+  if (std.min_temp !== null && std.max_temp !== null) return isAr ? `${std.min_temp}${unitAr} – ${std.max_temp}${unitAr}` : `${std.min_temp}${unit} – ${std.max_temp}${unit}`
+  if (std.min_temp !== null) return isAr ? `فوق ${std.min_temp}${unitAr}` : `Above ${std.min_temp}${unit}`
+  if (std.max_temp !== null) return isAr ? `تحت ${std.max_temp}${unitAr}` : `Below ${std.max_temp}${unit}`
   return isAr ? 'فحص امتثال' : 'Compliance check'
+}
+
+function formatActualValue(std, value) {
+  if (value == null) return ''
+  if (std.standard_type === 'weight') return `${value} ${std.unit || 'kg'}`
+  return `${value}°C`
 }
 
 export default function OwnerFoodSafety() {
@@ -48,9 +59,10 @@ export default function OwnerFoodSafety() {
   const [tplIdx,    setTplIdx]    = useState(null)
   const [stdName,   setStdName]   = useState('')
   const [stdNameAr, setStdNameAr] = useState('')
-  const [stdType,   setStdType]   = useState('temp') // 'temp' | 'compliance'
-  const [minTemp,   setMinTemp]   = useState('')
-  const [maxTemp,   setMaxTemp]   = useState('')
+  const [stdType,    setStdType]    = useState('temperature') // 'temperature' | 'weight' | 'compliance'
+  const [weightUnit, setWeightUnit] = useState('kg') // 'kg' | 'g' — only used when stdType === 'weight'
+  const [minTemp,    setMinTemp]    = useState('')
+  const [maxTemp,    setMaxTemp]    = useState('')
   const [branches_,  setBranches_] = useState([]) // selected branch IDs, empty = all
   const [saving,    setSaving]    = useState(false)
   const [saveOk,    setSaveOk]    = useState('')
@@ -67,7 +79,7 @@ export default function OwnerFoodSafety() {
 
       const [bRes, stdsRes] = await Promise.all([
         supabaseOwner.from('branches').select('id, name, name_ar').eq('owner_id', profile.id).eq('is_active', true),
-        supabaseOwner.from('food_safety_standards').select('id, name, name_ar, min_temp, max_temp, branch_id, is_active, created_at').eq('created_by', profile.id).eq('is_active', true).order('created_at', { ascending: false }),
+        supabaseOwner.from('food_safety_standards').select('id, name, name_ar, min_temp, max_temp, standard_type, unit, branch_id, is_active, created_at').eq('created_by', profile.id).eq('is_active', true).order('created_at', { ascending: false }),
       ])
       if (stdsRes.error) throw stdsRes.error
 
@@ -114,6 +126,7 @@ export default function OwnerFoodSafety() {
     setStdName(tpl.name)
     setStdNameAr(tpl.nameAr)
     setStdType(tpl.type)
+    setWeightUnit(tpl.type === 'weight' ? (tpl.unit || 'kg') : 'kg')
     setMinTemp(tpl.minTemp !== null ? String(tpl.minTemp) : '')
     setMaxTemp(tpl.maxTemp !== null ? String(tpl.maxTemp) : '')
     setSaveErr('')
@@ -139,14 +152,17 @@ export default function OwnerFoodSafety() {
     setSaving(true)
     try {
       const targets = branches_.length > 0 ? branches_ : [null]
+      const isNumericType = stdType === 'temperature' || stdType === 'weight'
       const inserts = targets.map(bId => ({
-        name:       stdName.trim(),
-        name_ar:    stdNameAr.trim() || stdName.trim(),
-        branch_id:  bId,
-        min_temp:   stdType === 'temp' && minTemp !== '' ? parseFloat(minTemp) : null,
-        max_temp:   stdType === 'temp' && maxTemp !== '' ? parseFloat(maxTemp) : null,
-        is_active:  true,
-        created_by: profile.id,
+        name:          stdName.trim(),
+        name_ar:       stdNameAr.trim() || stdName.trim(),
+        branch_id:     bId,
+        standard_type: stdType,
+        unit:          stdType === 'temperature' ? '°C' : stdType === 'weight' ? weightUnit : null,
+        min_temp:      isNumericType && minTemp !== '' ? parseFloat(minTemp) : null,
+        max_temp:      isNumericType && maxTemp !== '' ? parseFloat(maxTemp) : null,
+        is_active:     true,
+        created_by:    profile.id,
       }))
 
       const { error: insErr } = await supabaseOwner
@@ -159,7 +175,8 @@ export default function OwnerFoodSafety() {
       setTplIdx(null)
       setStdName('')
       setStdNameAr('')
-      setStdType('temp')
+      setStdType('temperature')
+      setWeightUnit('kg')
       setMinTemp('')
       setMaxTemp('')
       setBranches_([])
@@ -252,9 +269,9 @@ export default function OwnerFoodSafety() {
             ) : (
               <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
                 {standards.map(std => {
-                  const { icon, bg } = getIcon(std.name)
-                  const isTemp      = std.min_temp !== null || std.max_temp !== null
-                  const sub         = fsSubmissions.find(s => s.standard_id === std.id)
+                  const { icon, bg }  = getIcon(std.name, std.standard_type)
+                  const isNumericStd  = std.standard_type !== 'compliance'
+                  const sub           = fsSubmissions.find(s => s.standard_id === std.id)
                   const isPassed    = sub?.result === 'pass'
                   const isFailed    = sub?.result === 'fail'
                   const isPending   = !sub
@@ -275,20 +292,20 @@ export default function OwnerFoodSafety() {
                             {isAr ? std.name_ar || std.name : std.name}
                           </div>
                           <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
-                            <span style={{ fontSize:10, fontWeight:600, padding:'2px 8px', borderRadius:20, background: isTemp?'#EFF6FF':'#F0FDF4', color: isTemp?'#1D4ED8':'#166534' }}>
-                              {isTemp ? getRangeLabel(std, isAr) : (isAr?'فحص امتثال':'Compliance')}
+                            <span style={{ fontSize:10, fontWeight:600, padding:'2px 8px', borderRadius:20, background: std.standard_type==='weight'?'#FFFBEB':isNumericStd?'#EFF6FF':'#F0FDF4', color: std.standard_type==='weight'?'#B45309':isNumericStd?'#1D4ED8':'#166534' }}>
+                              {isNumericStd ? getRangeLabel(std, isAr) : (isAr?'فحص امتثال':'Compliance')}
                             </span>
                             <span style={{ fontSize:10, color:'#9CA3AF', display:'flex', alignItems:'center', gap:3 }}>
                               🏪 {getBranchName(std.branch_id)}
                             </span>
                             {isPassed && (
                               <span style={{ fontSize:10, fontWeight:600, padding:'2px 8px', borderRadius:20, background:'#D1FAE5', color:'#065F46' }}>
-                                ✓ {isAr?'ناجح':'Pass'}{sub.actual_value != null ? ` · ${sub.actual_value}°C` : ''}{mgr ? ` · ${mgr}` : ''}
+                                ✓ {isAr?'ناجح':'Pass'}{sub.actual_value != null ? ` · ${formatActualValue(std, sub.actual_value)}` : ''}{mgr ? ` · ${mgr}` : ''}
                               </span>
                             )}
                             {isFailed && (
                               <span style={{ fontSize:10, fontWeight:600, padding:'2px 8px', borderRadius:20, background:'#FEE2E2', color:'#991B1B' }}>
-                                ✗ {isAr?'فاشل':'Fail'}{sub.actual_value != null ? ` · ${sub.actual_value}°C` : ''}{mgr ? ` · ${mgr}` : ''}
+                                ✗ {isAr?'فاشل':'Fail'}{sub.actual_value != null ? ` · ${formatActualValue(std, sub.actual_value)}` : ''}{mgr ? ` · ${mgr}` : ''}
                               </span>
                             )}
                             {isPending && (
@@ -310,7 +327,7 @@ export default function OwnerFoodSafety() {
                             <span style={{ fontSize:11, fontWeight:600, color: isPassed?'#1B4332':'#9F1239' }}>{mgr}</span>
                             <span style={{ fontSize:11, color:'#9CA3AF' }}>· {time}</span>
                             {sub.actual_value != null && (
-                              <span style={{ fontSize:10, fontWeight:600, padding:'1px 7px', borderRadius:10, background: isPassed?'#D1FAE5':'#FEE2E2', color: isPassed?'#065F46':'#991B1B' }}>🌡 {sub.actual_value}°C</span>
+                              <span style={{ fontSize:10, fontWeight:600, padding:'1px 7px', borderRadius:10, background: isPassed?'#D1FAE5':'#FEE2E2', color: isPassed?'#065F46':'#991B1B' }}>{std.standard_type==='weight'?'⚖️':'🌡'} {formatActualValue(std, sub.actual_value)}</span>
                             )}
                           </div>
                           {sub.corrective_note && (
@@ -346,8 +363,11 @@ export default function OwnerFoodSafety() {
             </div>
             <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:6, marginBottom:6 }}>
               {TEMPLATES.map((tpl, idx) => {
-                const isOn = tplIdx === idx
-                const { icon } = getIcon(tpl.name)
+                const isOn   = tplIdx === idx
+                const isLast = idx === TEMPLATES.length - 1
+                const typeBadge = tpl.type==='temperature' ? { bg:'#EFF6FF', color:'#1D4ED8', label:isAr?'حرارة':'Temp' }
+                                : tpl.type==='weight'      ? { bg:'#FFFBEB', color:'#B45309', label:isAr?'وزن':'Weight' }
+                                : { bg:'#F0FDF4', color:'#166534', label:isAr?'امتثال':'Check' }
                 return (
                   <div key={tpl.name || idx} onClick={()=>pickTemplate(idx)}
                     style={{ borderRadius:12, border:`1.5px solid ${isOn?'#1B4332':'#E5E7EB'}`, background:isOn?'#F0FDF4':'#F9FAFB', cursor:'pointer', padding:'10px 6px', textAlign:'center', transition:'all 0.15s' }}
@@ -356,10 +376,10 @@ export default function OwnerFoodSafety() {
                   >
                     <span style={{ fontSize:20, display:'block', marginBottom:4 }}>{tpl.icon || '✏️'}</span>
                     <div style={{ fontSize:10, fontWeight:700, color:isOn?'#1B4332':'#374151' }}>
-                      {idx===5?(isAr?'مخصص':'Custom'):tpl.name.split(' ')[0]}
+                      {isLast?(isAr?'مخصص':'Custom'):tpl.name.split(' ')[0]}
                     </div>
-                    <span style={{ fontSize:9, fontWeight:600, padding:'2px 5px', borderRadius:20, display:'inline-block', marginTop:2, background: tpl.type==='temp'?'#EFF6FF':'#F0FDF4', color: tpl.type==='temp'?'#1D4ED8':'#166534' }}>
-                      {tpl.type==='temp'?(isAr?'حرارة':'Temp'):(isAr?'امتثال':'Check')}
+                    <span style={{ fontSize:9, fontWeight:600, padding:'2px 5px', borderRadius:20, display:'inline-block', marginTop:2, background:typeBadge.bg, color:typeBadge.color }}>
+                      {typeBadge.label}
                     </span>
                   </div>
                 )
@@ -400,10 +420,11 @@ export default function OwnerFoodSafety() {
                   <span style={{ width:20, height:20, borderRadius:'50%', background:'#1B4332', color:'#fff', fontSize:10, fontWeight:800, display:'inline-flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>2</span>
                   {isAr?'نوع المعيار':'Standard type'}
                 </div>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8 }}>
                   {[
-                    { val:'temp',       icon:'🌡', label:'Temperature', labelAr:'درجة حرارة' },
-                    { val:'compliance', icon:'✓',  label:'Compliance',  labelAr:'امتثال'     },
+                    { val:'temperature', icon:'🌡', label:'Temperature', labelAr:'درجة حرارة' },
+                    { val:'weight',      icon:'⚖️', label:'Weight',      labelAr:'الوزن'       },
+                    { val:'compliance',  icon:'✓',  label:'Compliance',  labelAr:'امتثال'     },
                   ].map(t => (
                     <div key={t.val} onClick={()=>setStdType(t.val)}
                       style={{ padding:'10px 8px', borderRadius:10, border:`1.5px solid ${stdType===t.val?'#1B4332':'#E5E7EB'}`, background:stdType===t.val?'#F0FDF4':'#F9FAFB', cursor:'pointer', textAlign:'center', transition:'all 0.15s' }}>
@@ -414,29 +435,45 @@ export default function OwnerFoodSafety() {
                 </div>
               </div>
 
-              {/* 3. Temperature range (only for temp type) */}
-              {stdType === 'temp' && (
+              {/* 3. Temperature/Weight range (only for numeric types) */}
+              {(stdType === 'temperature' || stdType === 'weight') && (
                 <div style={{ marginBottom:16 }}>
                   <div style={{ fontSize:11, fontWeight:700, color:'#374151', marginBottom:8, display:'flex', alignItems:'center', gap:6 }}>
                     <span style={{ width:20, height:20, borderRadius:'50%', background:'#1B4332', color:'#fff', fontSize:10, fontWeight:800, display:'inline-flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>3</span>
-                    {isAr?'نطاق الحرارة (°م)':'Temperature range (°C)'}
+                    {stdType === 'temperature'
+                      ? (isAr?'نطاق الحرارة (°م)':'Temperature range (°C)')
+                      : (isAr?`نطاق الوزن (${weightUnit==='kg'?'كجم':'جم'})`:`Weight range (${weightUnit})`)}
                   </div>
+
+                  {stdType === 'weight' && (
+                    <div style={{ display:'flex', gap:6, marginBottom:8 }}>
+                      {['kg','g'].map(u => (
+                        <div key={u} onClick={()=>setWeightUnit(u)}
+                          style={{ flex:1, padding:'7px 8px', borderRadius:8, border:`1.5px solid ${weightUnit===u?'#1B4332':'#E5E7EB'}`, background:weightUnit===u?'#F0FDF4':'#F9FAFB', fontSize:11, fontWeight:700, color:weightUnit===u?'#1B4332':'#6B7280', textAlign:'center', cursor:'pointer' }}>
+                          {u==='kg'?(isAr?'كجم':'kg'):(isAr?'جم':'g')}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
                   <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
                     <div>
-                      <div style={{ fontSize:10, color:'#9CA3AF', marginBottom:4 }}>{isAr?'الحد الأدنى':'Min temp'}</div>
+                      <div style={{ fontSize:10, color:'#9CA3AF', marginBottom:4 }}>{isAr?'الحد الأدنى':(stdType==='temperature'?'Min temp':'Min weight')}</div>
                       <input type="number" value={minTemp} onChange={e=>setMinTemp(e.target.value)}
-                        placeholder={isAr?'مثال: 2':'e.g. 2'} style={inputStyle}
+                        placeholder={stdType==='temperature'?(isAr?'مثال: 2':'e.g. 2'):(isAr?'مثال: 0.5':'e.g. 0.5')} style={inputStyle}
                         onFocus={e=>e.target.style.borderColor='#1B4332'} onBlur={e=>e.target.style.borderColor='#E5E7EB'} />
                     </div>
                     <div>
-                      <div style={{ fontSize:10, color:'#9CA3AF', marginBottom:4 }}>{isAr?'الحد الأقصى':'Max temp'}</div>
+                      <div style={{ fontSize:10, color:'#9CA3AF', marginBottom:4 }}>{isAr?'الحد الأقصى':(stdType==='temperature'?'Max temp':'Max weight')}</div>
                       <input type="number" value={maxTemp} onChange={e=>setMaxTemp(e.target.value)}
-                        placeholder={isAr?'مثال: 8':'e.g. 8'} style={inputStyle}
+                        placeholder={stdType==='temperature'?(isAr?'مثال: 8':'e.g. 8'):(isAr?'مثال: 2':'e.g. 2')} style={inputStyle}
                         onFocus={e=>e.target.style.borderColor='#1B4332'} onBlur={e=>e.target.style.borderColor='#E5E7EB'} />
                     </div>
                   </div>
                   <div style={{ fontSize:10, color:'#9CA3AF', marginTop:5 }}>
-                    {isAr?'اترك الحد الأدنى فارغاً للمعايير "تحت درجة معينة" والعكس':'Leave min empty for "below X°C" standards and vice versa'}
+                    {stdType === 'temperature'
+                      ? (isAr?'اترك الحد الأدنى فارغاً للمعايير "تحت درجة معينة" والعكس':'Leave min empty for "below X°C" standards and vice versa')
+                      : (isAr?'اترك الحد الأدنى فارغاً للمعايير "أقل من X" والعكس':'Leave min empty for "below X" standards and vice versa')}
                   </div>
                 </div>
               )}
@@ -444,7 +481,7 @@ export default function OwnerFoodSafety() {
               {/* 4. Branches */}
               <div style={{ marginBottom:20 }}>
                 <div style={{ fontSize:11, fontWeight:700, color:'#374151', marginBottom:8, display:'flex', alignItems:'center', gap:6 }}>
-                  <span style={{ width:20, height:20, borderRadius:'50%', background:'#1B4332', color:'#fff', fontSize:10, fontWeight:800, display:'inline-flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>{stdType==='temp'?'4':'3'}</span>
+                  <span style={{ width:20, height:20, borderRadius:'50%', background:'#1B4332', color:'#fff', fontSize:10, fontWeight:800, display:'inline-flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>{stdType==='compliance'?'3':'4'}</span>
                   {isAr?'أي الفروع؟':'Which branches?'}
                 </div>
                 <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>

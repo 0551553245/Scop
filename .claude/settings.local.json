@@ -5,7 +5,9 @@
       "PowerShell(Get-ChildItem \"C:\\\\scop\\\\.claude\\\\skills\" -Recurse -Filter \"SKILL.md\" | Sort-Object FullName | ForEach-Object { Write-Output \"--- $\\($_.FullName\\)\"; Get-Content $_.FullName -Encoding UTF8 -TotalCount 1 | Select-Object -First 1 | ForEach-Object { $_.Substring\\(0, [Math]::Min\\(80, $_.Length\\)\\) + \"...\" } })",
       "PowerShell(try { $r = Invoke-WebRequest -Uri \"http://localhost:5173\" -UseBasicParsing -TimeoutSec 5; Write-Output \"Status: $\\($r.StatusCode\\)\"; $r.Content | Select-String \"root\" } catch { Write-Output \"Error: $_\" })",
       "PowerShell(Copy-Item *)",
-      "PowerShell(git *)"
+      "PowerShell(git *)",
+      "Bash(npm run *)",
+      "Bash(git *)"
     ]
   }
 }

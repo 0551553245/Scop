@@ -9,7 +9,8 @@ function formatTime(iso) {
   return new Date(iso).toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit', hour12:true })
 }
 
-function getStandardIcon(name) {
+function getStandardIcon(name, type) {
+  if (type === 'weight') return { icon:null, tablerIcon:'ti-scale', bg:'#FFFBEB' }
   const n = (name || '').toLowerCase()
   if (n.includes('fridge') || n.includes('cold') || n.includes('refriger')) return { icon:'🧊', bg:'#EFF6FF' }
   if (n.includes('freezer')) return { icon:'❄️', bg:'#EFF6FF' }
@@ -20,10 +21,18 @@ function getStandardIcon(name) {
 }
 
 function getRangeLabel(std, isAr) {
-  if (std.min_temp !== null && std.max_temp !== null) return isAr ? `${std.min_temp}°م – ${std.max_temp}°م` : `${std.min_temp}°C – ${std.max_temp}°C`
-  if (std.min_temp !== null) return isAr ? `فوق ${std.min_temp}°م` : `Above ${std.min_temp}°C`
-  if (std.max_temp !== null) return isAr ? `تحت ${std.max_temp}°م` : `Below ${std.max_temp}°C`
+  const unit   = std.standard_type === 'weight' ? (std.unit || 'kg') : '°C'
+  const unitAr = std.standard_type === 'weight' ? (std.unit === 'g' ? 'جم' : 'كجم') : '°م'
+  if (std.min_temp !== null && std.max_temp !== null) return isAr ? `${std.min_temp}${unitAr} – ${std.max_temp}${unitAr}` : `${std.min_temp}${unit} – ${std.max_temp}${unit}`
+  if (std.min_temp !== null) return isAr ? `فوق ${std.min_temp}${unitAr}` : `Above ${std.min_temp}${unit}`
+  if (std.max_temp !== null) return isAr ? `تحت ${std.max_temp}${unitAr}` : `Below ${std.max_temp}${unit}`
   return isAr ? 'فحص امتثال' : 'Compliance check'
+}
+
+function formatActualValue(std, value) {
+  if (value == null) return ''
+  if (std.standard_type === 'weight') return `${value} ${std.unit || 'kg'}`
+  return `${value}°C`
 }
 
 function checkResult(value, std) {
@@ -71,7 +80,7 @@ export default function BMFoodSafety() {
       const ownerId   = branchRes.data?.owner_id
 
       const [stdsRes, subsRes] = await Promise.all([
-        supabaseBranchManager.from('food_safety_standards').select('id, name, name_ar, description, min_temp, max_temp, branch_id').eq('is_active', true).or(`branch_id.eq.${branchId},and(branch_id.is.null,created_by.eq.${ownerId})`).order('created_at', { ascending: true }),
+        supabaseBranchManager.from('food_safety_standards').select('id, name, name_ar, description, min_temp, max_temp, standard_type, unit, branch_id').eq('is_active', true).or(`branch_id.eq.${branchId},and(branch_id.is.null,created_by.eq.${ownerId})`).order('created_at', { ascending: true }),
         supabaseBranchManager.from('food_safety_submissions').select('id, standard_id, result, actual_value, corrective_note, submitted_at').eq('branch_id', branchId).eq('submitted_by', profile.id).gte('submitted_at', `${today}T00:00:00.000Z`).lte('submitted_at', `${today}T23:59:59.999Z`).limit(500),
       ])
 
@@ -122,7 +131,7 @@ export default function BMFoodSafety() {
     return () => { debouncedFetch.cancel(); supabaseBranchManager.removeChannel(ch) }
   }, [profile?.id, profile?.branch_id, fetchData])
 
-  const isTemperatureStd = (std) => std.min_temp !== null || std.max_temp !== null
+  const isNumericStd = (std) => std.standard_type !== 'compliance'
 
   async function handleSubmit(std) {
     const stdId = std.id
@@ -133,17 +142,17 @@ export default function BMFoodSafety() {
       return
     }
 
-    const isTempStd = isTemperatureStd(std)
+    const isNumeric = isNumericStd(std)
     const tempVal   = tempValues[stdId] ? parseFloat(tempValues[stdId]) : null
     const compVal   = compliance[stdId] // 'pass' or 'fail'
     const note      = notes[stdId] || null
 
     // Validation
-    if (isTempStd && (tempVal === null || isNaN(tempVal))) {
-      setError(isAr ? 'يرجى إدخال قراءة درجة الحرارة' : 'Please enter a temperature reading.')
+    if (isNumeric && (tempVal === null || isNaN(tempVal))) {
+      setError(isAr ? 'يرجى إدخال القراءة' : 'Please enter a reading.')
       return
     }
-    if (!isTempStd && !compVal) {
+    if (!isNumeric && !compVal) {
       setError(isAr ? 'يرجى اختيار ناجح أو فاشل' : 'Please select Pass or Fail.')
       return
     }
@@ -152,7 +161,7 @@ export default function BMFoodSafety() {
     setSubmitting(p => ({ ...p, [stdId]: true }))
 
     try {
-      const result = isTempStd ? checkResult(tempVal, std) : compVal
+      const result = isNumeric ? checkResult(tempVal, std) : compVal
 
       await supabaseBranchManager
         .from('food_safety_submissions')
@@ -161,7 +170,7 @@ export default function BMFoodSafety() {
           branch_id:        profile.branch_id,
           submitted_by:     profile.id,
           result:           result,
-          actual_value:     isTempStd ? tempVal : null,
+          actual_value:     isNumeric ? tempVal : null,
           corrective_note:  note,
           submitted_at:     new Date().toISOString(),
         })
@@ -238,13 +247,13 @@ export default function BMFoodSafety() {
 
           {/* Standards list — pending first */}
           {standards.map(({ standard: std, submission: sub }) => {
-            const isTempStd = isTemperatureStd(std)
+            const isNumeric = isNumericStd(std)
             const isPending = !sub
             const isPassed  = sub?.result === 'pass'
             const isFailed  = sub?.result === 'fail'
             const isExp     = expanded === std.id
             const isSaving  = submitting[std.id]
-            const { icon, bg } = getStandardIcon(std.name)
+            const { icon, bg, tablerIcon } = getStandardIcon(std.name, std.standard_type)
 
             const borderColor = isPending ? '#F59E0B' : isPassed ? '#1B4332' : '#E24B4A'
             const opacity     = isPassed ? 0.7 : 1
@@ -262,7 +271,9 @@ export default function BMFoodSafety() {
                   style={{ display:'flex', alignItems:'center', gap:12, padding:'14px 16px', cursor:'pointer' }}
                   onClick={() => setExpanded(isExp ? null : std.id)}
                 >
-                  <div style={{ width:36, height:36, borderRadius:8, background:bg, display:'flex', alignItems:'center', justifyContent:'center', fontSize:17, flexShrink:0 }}>{icon}</div>
+                  <div style={{ width:36, height:36, borderRadius:8, background:bg, display:'flex', alignItems:'center', justifyContent:'center', fontSize:17, flexShrink:0 }}>
+                    {tablerIcon ? <i className={`ti ${tablerIcon}`} /> : icon}
+                  </div>
                   <div style={{ flex:1 }}>
                     <div style={{ fontSize:13, fontWeight:500, color: isPassed?'#6B7280':'#111827' }}>
                       {isAr ? std.name_ar || std.name : std.name}
@@ -273,7 +284,7 @@ export default function BMFoodSafety() {
                   </div>
                   <div style={{ display:'flex', alignItems:'center', gap:8, flexShrink:0 }}>
                     {sub?.actual_value !== null && sub?.actual_value !== undefined && (
-                      <div style={{ fontSize:11, fontWeight:500, color:'#1B4332' }}>{sub.actual_value}°C</div>
+                      <div style={{ fontSize:11, fontWeight:500, color:'#1B4332' }}>{formatActualValue(std, sub.actual_value)}</div>
                     )}
                     <div style={{
                       fontSize:11, fontWeight:500, padding:'4px 10px', borderRadius:20,
@@ -292,11 +303,11 @@ export default function BMFoodSafety() {
 
                     {isPending ? (
                       <>
-                        {/* Temperature input */}
-                        {isTempStd && (
+                        {/* Numeric input — temperature or weight */}
+                        {isNumeric && (
                           <div style={{ background:'#F9FAFB', border:'0.5px solid #E5E7EB', borderRadius:12, padding:16, display:'flex', alignItems:'center', gap:12, marginTop:10 }}>
                             <div>
-                              <div style={{ fontSize:10, color:'#9CA3AF', marginBottom:4 }}>{isAr?'أدخل درجة الحرارة':'Enter temperature'}</div>
+                              <div style={{ fontSize:10, color:'#9CA3AF', marginBottom:4 }}>{std.standard_type==='weight'?(isAr?'أدخل الوزن':'Enter weight'):(isAr?'أدخل درجة الحرارة':'Enter temperature')}</div>
                               <div style={{ display:'flex', alignItems:'baseline', gap:4 }}>
                                 <input
                                   type="number"
@@ -305,7 +316,7 @@ export default function BMFoodSafety() {
                                   placeholder="0"
                                   style={{ border:'none', background:'transparent', fontSize:36, fontWeight:500, color:'#111827', width:90, outline:'none', fontFamily:'inherit' }}
                                 />
-                                <div style={{ fontSize:24, color:'#9CA3AF', fontWeight:500 }}>°C</div>
+                                <div style={{ fontSize:24, color:'#9CA3AF', fontWeight:500 }}>{std.unit || '°C'}</div>
                               </div>
                             </div>
                             <div style={{ marginLeft:'auto', textAlign:'right' }}>
@@ -323,7 +334,7 @@ export default function BMFoodSafety() {
                         )}
 
                         {/* Pass/Fail toggle for compliance checks */}
-                        {!isTempStd && (
+                        {!isNumeric && (
                           <div style={{ display:'flex', gap:8, marginTop:10 }}>
                             {['pass','fail'].map(v => (
                               <div key={v} onClick={() => setCompliance(p => ({ ...p, [std.id]: v }))}
@@ -365,7 +376,7 @@ export default function BMFoodSafety() {
                         <span style={{ color:'#1B4332', fontSize:18 }}>✓</span>
                         <div style={{ fontSize:12, fontWeight:500, color:'#1B4332', flex:1 }}>
                           {sub.actual_value !== null && sub.actual_value !== undefined
-                            ? `${sub.actual_value}°C ${isAr?'— تم الإرسال':'— submitted'}`
+                            ? `${formatActualValue(std, sub.actual_value)} ${isAr?'— تم الإرسال':'— submitted'}`
                             : (sub.result === 'pass' ? (isAr?'ناجح':'Passed') : (isAr?'فاشل':'Failed'))
                           }
                           {sub.corrective_note ? ` · ${sub.corrective_note}` : ''}

@@ -1814,4 +1814,17 @@ if (!existingSub) {
 
 **Rule:** `subscriptions` table has (or must have) a UNIQUE constraint on `owner_id`. Always check for an existing row before inserting. Prefer upsert over insert for subscription rows. Never assume `completeSetup()` only runs once — email links can be clicked multiple times.
 
-## Bug count: #038 – #154 (117 bugs total)
+---
+
+## BUG #155 — FEATURE: Added "Weight" standard type to food_safety_standards
+
+**Files:** Supabase SQL (`food_safety_standards` schema), `owner/FoodSafety.jsx`, `branch-manager/FoodSafety.jsx`
+**Context:** Before this change, `food_safety_standards` had no `type` column at all — "temperature" vs "compliance" was inferred purely from whether `min_temp`/`max_temp` were null (`min_temp !== null || max_temp !== null`). Every label, icon, and unit suffix across both FoodSafety pages was hardcoded to `°C`, with no way to represent a numeric standard type other than temperature.
+**Change:**
+1. Added two columns via `ALTER TABLE public.food_safety_standards ADD COLUMN IF NOT EXISTS standard_type TEXT DEFAULT 'temperature', ADD COLUMN IF NOT EXISTS unit TEXT DEFAULT '°C'`, then backfilled existing rows using the same inference the app already used (`min_temp/max_temp` non-null → `'temperature'`/`'°C'`, else `'compliance'`/`null`).
+2. `standard_type` is one of `'temperature' | 'weight' | 'compliance'`. `unit` is `'°C' | 'kg' | 'g' | null`.
+3. `owner/FoodSafety.jsx`: `stdType` renamed from `'temp'` to `'temperature'` to match the DB value directly (no translation layer). Added a `weightUnit` state (`'kg'|'g'`, default `'kg'`) for the weight sub-toggle. `handleSave` now explicitly inserts `standard_type` and `unit` instead of leaving them to column defaults. `getRangeLabel()` and the new `formatActualValue()` helper read `std.unit`/`std.standard_type` instead of hardcoding `°C`.
+4. `branch-manager/FoodSafety.jsx`: `isTemperatureStd()` renamed to `isNumericStd()` and redefined as `std.standard_type !== 'compliance'` (previously inferred from null-ness, which couldn't actually distinguish "weight" from "temperature" — this was a latent gap the type column fixes). All hardcoded `°C` suffixes (input display, submitted-value display) now read `std.unit`.
+**Rule:** Any future new "standard type" for food safety must set `standard_type` explicitly on insert — never rely on `min_temp`/`max_temp` null-ness alone to distinguish types, since two different numeric types (temperature, weight) can both have non-null min/max. Always add the type to both pages' `.select()` calls, or it silently falls back to the default and every label reverts to temperature/°C.
+
+## Bug count: #038 – #155 (118 bugs total)
