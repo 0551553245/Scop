@@ -138,7 +138,7 @@ function ErrorBanner({ msg }) {
 
 export default function OwnerRegister() {
   const navigate = useNavigate()
-  const { lang, isAr, toggleLang } = useLanguage()
+  const { isAr, toggleLang } = useLanguage()
 
   const [step, setStep] = useState(1)
   const [selectedPlan, setSelectedPlan] = useState('starter')

@@ -47,7 +47,7 @@ function barColor(pct) {
 
 export default function OwnerBranches() {
   const { profile } = useOwnerAuth()
-  const { lang, isAr, toggleLang } = useLanguage()
+  const { isAr, toggleLang } = useLanguage()
   const { subscription, isExpired } = useSubscription()
 
   // ── DATA ──────────────────────────────────────────────────

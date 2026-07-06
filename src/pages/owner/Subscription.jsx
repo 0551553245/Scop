@@ -4,7 +4,6 @@ import { getCached, setCached } from '../../lib/cache'
 import { useOwnerAuth } from '../../context/OwnerAuthContext'
 import { useLanguage } from '../../context/LanguageContext'
 import { useSubscription } from '../../hooks/useSubscription'
-import { calcRate } from '../../lib/stats'
 import SubscriptionBanner from '../../components/SubscriptionBanner'
 import { getPlatformSettings, getPlanLimits, DEFAULT_SETTINGS } from '../../lib/platformSettings'
 import OwnerLayout from '../../components/OwnerLayout'
@@ -16,8 +15,6 @@ const PLAN_FEATURES = {
   growth:  { branches: 5,  managers: 5,  price: 499, label: 'Growth',     labelAr: 'النمو'         },
   pro:     { branches: 15, managers: 99, price: 999, label: 'Pro',        labelAr: 'الاحترافي'    },
 }
-
-const NEXT_PLAN = { trial: 'starter', starter: 'growth', growth: 'pro', pro: null }
 
 const FEATURE_LIST = {
   trial: [
@@ -66,12 +63,6 @@ function formatDate(dateStr, lang) {
   return new Date(dateStr).toLocaleDateString(lang === 'ar' ? 'ar-SA' : 'en-US', { year:'numeric', month:'short', day:'numeric' })
 }
 
-function usageColor(pct) {
-  if (pct >= 90) return '#F43F5E'
-  if (pct >= 70) return '#F59E0B'
-  return '#1B4332'
-}
-
 function billingStatusStyle(status) {
   if (status === 'paid' || status === 'success' || status === 'completed') return { bg:'#F0FDF4', color:'#166534' }
   if (status === 'failed' || status === 'declined')                        return { bg:'#FFF1F2', color:'#9F1239' }
@@ -82,7 +73,7 @@ const PLAN_RANK = { trial:0, starter:1, growth:2, pro:3 }
 
 export default function OwnerSubscription() {
   const { profile }  = useOwnerAuth()
-  const { lang, isAr, toggleLang } = useLanguage()
+  const { lang, isAr } = useLanguage()
   const { subscription, loading: subLoading, isTrial, isExpired, expiringSoon, daysLeft } = useSubscription()
 
   // ── EXTRA DATA (usage counts + billing) ────────────────────
@@ -174,18 +165,6 @@ export default function OwnerSubscription() {
   const plan        = planFeature && livePlan ? { ...planFeature, price: livePlan.price, branches: livePlan.branches, managers: livePlan.managers } : planFeature
   const status   = subscription?.status || 'trial'
   const badge    = STATUS_BADGE[status] || STATUS_BADGE.trial
-  const features = subscription ? FEATURE_LIST[subscription.plan] || FEATURE_LIST.starter : []
-  const nextPlanKey = subscription ? NEXT_PLAN[subscription.plan] : null
-  const nextPlanFeature = nextPlanKey ? PLAN_FEATURES[nextPlanKey] : null
-  const nextPlanLive    = nextPlanKey ? planLimits[nextPlanKey] : null
-  const nextPlan        = nextPlanFeature && nextPlanLive ? { ...nextPlanFeature, price: nextPlanLive.price, branches: nextPlanLive.branches, managers: nextPlanLive.managers } : nextPlanFeature
-
-  const branchPct  = subscription ? calcRate(branchCount, subscription.branches_limit) : 0
-  const managerPct = subscription ? calcRate(managerCount, subscription.managers_limit) : 0
-
-  const priceLabel = !plan ? '—' : plan.price === 0
-    ? (isAr ? 'مجاني' : 'Free')
-    : isAr ? `${plan.price} ريال/شهر` : `${plan.price} SAR/mo`
 
   const renewalText = !subscription ? '' : isExpired
     ? (isAr ? `انتهى في ${formatDate(subscription.expires_at, lang)}` : `Expired on ${formatDate(subscription.expires_at, lang)}`)

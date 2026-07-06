@@ -2,12 +2,10 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabaseOwner } from '../../lib/supabase'
 import { useLanguage } from '../../context/LanguageContext'
-import { getPlatformSettings, getPlanLimits } from '../../lib/platformSettings'
-
 export default function EmailVerify() {
   const { isAr } = useLanguage()
   const [status, setStatus] = useState('loading')
-  const [errorMsg, setErrorMsg] = useState('')
+  const [, setErrorMsg] = useState('')
 
   useEffect(() => {
     let settled = false
@@ -31,12 +29,6 @@ export default function EmailVerify() {
       setStatus('completing')
 
       try {
-        let pl = getPlanLimits({})
-        try {
-          const settings = await getPlatformSettings(supabaseOwner)
-          pl = getPlanLimits(settings)
-        } catch {}
-
         const { error: userErr } = await supabaseOwner.from('users').upsert({
           id:        userId,
           email:     email,

@@ -250,7 +250,6 @@ export default function BMFoodSafety() {
             const isNumeric = isNumericStd(std)
             const isPending = !sub
             const isPassed  = sub?.result === 'pass'
-            const isFailed  = sub?.result === 'fail'
             const isExp     = expanded === std.id
             const isSaving  = submitting[std.id]
             const { icon, bg, tablerIcon } = getStandardIcon(std.name, std.standard_type)

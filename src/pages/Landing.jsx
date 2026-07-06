@@ -195,7 +195,7 @@ export default function Landing() {
     link.rel  = 'stylesheet'
     link.href = 'https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700&display=swap'
     document.head.appendChild(link)
-    return () => { try { document.head.removeChild(link) } catch (_) {} }
+    return () => { try { document.head.removeChild(link) } catch {} }
   }, [])
 
   function scrollTo(id) {
