@@ -6,6 +6,7 @@ import { useLanguage } from '../context/LanguageContext'
 import { prefetchOwnerTasks } from '../lib/prefetch'
 import NotificationBell from './NotificationBell'
 import ScopLogo from './ScopLogo'
+import ErrorBoundary from './ErrorBoundary'
 
 const DVH = window.CSS?.supports('height', '100dvh') ? '100dvh' : '100vh'
 
@@ -151,7 +152,7 @@ export default function OwnerLayout({ activePath, title, titleAr, topbarLeft, to
           <div style={{ flexShrink: 1, minWidth: 0 }}>{topbarRight || defaultTopbarRight}</div>
         </div>
         <div style={{ flex: 1, overflowY: 'auto' }}>
-          {children}
+          <ErrorBoundary>{children}</ErrorBoundary>
         </div>
       </div>
 

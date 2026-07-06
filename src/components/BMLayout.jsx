@@ -5,6 +5,7 @@ import { useBranchManagerAuth } from '../context/BranchManagerAuthContext'
 import { useLanguage } from '../context/LanguageContext'
 import { prefetchBMDailyTasks } from '../lib/prefetch'
 import ScopLogo from './ScopLogo'
+import ErrorBoundary from './ErrorBoundary'
 
 const DVH = window.CSS?.supports('height', '100dvh') ? '100dvh' : '100vh'
 
@@ -134,7 +135,7 @@ export default function BMLayout({ activePath, title, titleAr, subtitle, branchN
           </div>
         </div>
         <div style={{ flex:1, overflowY:'auto' }}>
-          {children}
+          <ErrorBoundary>{children}</ErrorBoundary>
         </div>
       </div>
 

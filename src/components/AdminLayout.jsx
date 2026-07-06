@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useIsMobile } from '../hooks/useIsMobile'
 import { Link } from 'react-router-dom'
 import ScopLogo from './ScopLogo'
+import ErrorBoundary from './ErrorBoundary'
 
 const DVH = window.CSS?.supports('height', '100dvh') ? '100dvh' : '100vh'
 
@@ -138,7 +139,7 @@ export default function AdminLayout({ currentPath, profile, isAr, handleSignOut,
 
         {/* Page content */}
         <div style={{ flex: 1, overflowY: 'auto' }}>
-          {children}
+          <ErrorBoundary>{children}</ErrorBoundary>
         </div>
 
       </div>

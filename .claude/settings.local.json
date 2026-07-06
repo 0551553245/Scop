@@ -7,7 +7,11 @@
       "PowerShell(Copy-Item *)",
       "PowerShell(git *)",
       "Bash(npm run *)",
-      "Bash(git *)"
+      "Bash(git *)",
+      "Bash(xargs wc -l)",
+      "Bash(grep -v \"^$\")",
+      "Read(//tmp/**)",
+      "Bash(awk -F: '{sum+=$2} END {print \"total console calls:\", sum}')"
     ]
   }
 }
