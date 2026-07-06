@@ -1827,4 +1827,22 @@ if (!existingSub) {
 4. `branch-manager/FoodSafety.jsx`: `isTemperatureStd()` renamed to `isNumericStd()` and redefined as `std.standard_type !== 'compliance'` (previously inferred from null-ness, which couldn't actually distinguish "weight" from "temperature" — this was a latent gap the type column fixes). All hardcoded `°C` suffixes (input display, submitted-value display) now read `std.unit`.
 **Rule:** Any future new "standard type" for food safety must set `standard_type` explicitly on insert — never rely on `min_temp`/`max_temp` null-ness alone to distinguish types, since two different numeric types (temperature, weight) can both have non-null min/max. Always add the type to both pages' `.select()` calls, or it silently falls back to the default and every label reverts to temperature/°C.
 
-## Bug count: #038 – #155 (118 bugs total)
+---
+
+## BUG #156 — CRITICAL: BM DailyTasks/WeeklyTasks/MonthlyTasks/FoodSafety cache keys scoped by branch_id but data scoped by submitted_by — one manager could see another's submission cache
+
+**Files:** src/pages/branch-manager/DailyTasks.jsx, WeeklyTasks.jsx, MonthlyTasks.jsx, FoodSafety.jsx
+**Symptom:** Two branch manager accounts assigned to the same branch could, within the cache's 30-second TTL window, see each other's task-completion or food-safety-submission state — a task/standard the other manager submitted (or didn't) rendered as this manager's own status.
+**Root cause:** Each page's `task_submissions`/`food_safety_submissions` query is filtered by `.eq('submitted_by', profile.id)` (only this manager's own completions), but the cache key was `bm-{daily|weekly|monthly}-tasks-${profile.branch_id}-${date}` / `bm-food-safety-${profile.branch_id}-${today}` — scoped by branch, not by manager. Two managers on the same branch share the same `branch_id`, so they collided on the same cache entry and could read back the other manager's cached `{ branch, tasks }` / `{ branch, standards }` shape. This is the same class of bug as BUG #082 (real-time channel names using `branch_id` instead of `profile.id`), just in the cache layer instead of the realtime layer.
+**Fix:** Changed all 8 cache-key occurrences (2 per file — one in the fetch function, one in the real-time-triggered `invalidateCache` call) from `profile.branch_id` to `profile.id`:
+```js
+// WRONG — shared across every manager at the branch:
+const cacheKey = `bm-daily-tasks-${profile.branch_id}-${today}`
+
+// CORRECT — unique per manager:
+const cacheKey = `bm-daily-tasks-${profile.id}-${today}`
+```
+Only the cache key string changed — the actual Supabase query filters (`.eq('branch_id', branchId)`) are untouched and still correctly scope which rows are fetched.
+**Rule:** A cache key must be scoped to match the narrowest filter used in the query it caches. If a query is filtered by `submitted_by`/`profile.id`, the cache key MUST include `profile.id`, not just `branch_id` — even though the *fetch* also filters by branch. `branch_id`-only cache keys are only correct when the underlying query is genuinely branch-wide (e.g. `owner/Dashboard`-style aggregate stats, `bm-schedule` events, `bm-dashboard` team-wide stats) with no per-user filter. Check the actual `.eq()`/`.filter()` clauses on the query before picking a cache key — don't assume "branch page → branch-scoped key."
+
+## Bug count: #038 – #156 (119 bugs total)

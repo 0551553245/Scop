@@ -28,7 +28,7 @@ export default function BMDailyTasks() {
     setError('')
 
     const today    = new Date().toISOString().split('T')[0]
-    const cacheKey = `bm-daily-tasks-${profile.branch_id}-${today}`
+    const cacheKey = `bm-daily-tasks-${profile.id}-${today}`
     const cached = getCached(cacheKey)
     if (cached) {
       setBranch(cached.branch)
@@ -73,7 +73,7 @@ export default function BMDailyTasks() {
   useEffect(() => {
     if (!profile?.branch_id) return
     const today    = new Date().toISOString().split('T')[0]
-    const cacheKey = `bm-daily-tasks-${profile.branch_id}-${today}`
+    const cacheKey = `bm-daily-tasks-${profile.id}-${today}`
     const debouncedFetch = debounce(() => { invalidateCache(cacheKey); fetchTasks() }, 300)
     const ch = supabaseBranchManager
       .channel(`bm-daily-tasks-rt-${profile.id}`)

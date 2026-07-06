@@ -30,7 +30,7 @@ export default function BranchManagerWeeklyTasks() {
     setError('')
 
     const weekStart = getWeekStartStr()
-    const cacheKey = `bm-weekly-tasks-${profile.branch_id}-${weekStart}`
+    const cacheKey = `bm-weekly-tasks-${profile.id}-${weekStart}`
     const cached = getCached(cacheKey)
     if (cached) {
       setBranch(cached.branch)
@@ -76,7 +76,7 @@ export default function BranchManagerWeeklyTasks() {
 
   useEffect(() => {
     if (!profile?.branch_id) return
-    const cacheKey = `bm-weekly-tasks-${profile.branch_id}-${getWeekStartStr()}`
+    const cacheKey = `bm-weekly-tasks-${profile.id}-${getWeekStartStr()}`
     const debouncedFetch = debounce(() => { invalidateCache(cacheKey); fetchTasks() }, 300)
     const ch = supabaseBranchManager
       .channel(`bm-weekly-tasks-${profile.id}`)

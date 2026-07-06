@@ -29,7 +29,7 @@ export default function BranchManagerMonthlyTasks() {
     setError('')
 
     const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]
-    const cacheKey = `bm-monthly-tasks-${profile.branch_id}-${monthStart}`
+    const cacheKey = `bm-monthly-tasks-${profile.id}-${monthStart}`
     const cached = getCached(cacheKey)
     if (cached) {
       setBranch(cached.branch)
@@ -75,7 +75,7 @@ export default function BranchManagerMonthlyTasks() {
 
   useEffect(() => {
     if (!profile?.branch_id) return
-    const cacheKey = `bm-monthly-tasks-${profile.branch_id}-${new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]}`
+    const cacheKey = `bm-monthly-tasks-${profile.id}-${new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]}`
     const ch = supabaseBranchManager
       .channel(`bm-monthly-tasks-${profile.id}`)
       .on('postgres_changes', {

@@ -64,7 +64,7 @@ export default function BMFoodSafety() {
     setError('')
 
     const today    = new Date().toISOString().split('T')[0]
-    const cacheKey = `bm-food-safety-${profile.branch_id}-${today}`
+    const cacheKey = `bm-food-safety-${profile.id}-${today}`
     const cached = getCached(cacheKey)
     if (cached) {
       setBranch(cached.branch)
@@ -120,7 +120,7 @@ export default function BMFoodSafety() {
 
   useEffect(() => {
     if (!profile?.branch_id) return
-    const debouncedFetch = debounce(() => { invalidateCache(`bm-food-safety-${profile.branch_id}-${new Date().toISOString().split('T')[0]}`); fetchData() }, 300)
+    const debouncedFetch = debounce(() => { invalidateCache(`bm-food-safety-${profile.id}-${new Date().toISOString().split('T')[0]}`); fetchData() }, 300)
     const ch = supabaseBranchManager
       .channel(`bm-fs-${profile.id}`)
       .on('postgres_changes', {
