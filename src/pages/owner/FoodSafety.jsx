@@ -311,6 +311,9 @@ export default function OwnerFoodSafety() {
                               {branches.map(branch => {
                                 const status   = cellStatus(std, branch.id)
                                 const isActive = selectedCell?.standardId === std.id && selectedCell?.branchId === branch.id
+                                const sub       = (status === 'done' || status === 'missed')
+                                  ? fsSubmissions.find(s => s.standard_id === std.id && s.branch_id === branch.id)
+                                  : null
                                 const CELL_CFG = {
                                   done:    { bg:'#F0FDF4', border:'#BBF7D0', color:'#1B4332', tablerIcon:'ti-check',     cursor:'pointer' },
                                   missed:  { bg:'#FEF2F2', border:'#FECACA', color:'#DC2626', tablerIcon:'ti-x',         cursor:'pointer' },
@@ -319,6 +322,7 @@ export default function OwnerFoodSafety() {
                                 }
                                 const cfg       = CELL_CFG[status] || CELL_CFG.none
                                 const clickable = status === 'done' || status === 'missed'
+                                const valueText = sub?.actual_value != null ? formatActualValue(std, sub.actual_value) : null
                                 return (
                                   <td key={branch.id} style={{ padding:'6px', textAlign:'center' }}>
                                     <span
@@ -328,8 +332,8 @@ export default function OwnerFoodSafety() {
                                           : { standardId: std.id, branchId: branch.id }
                                       ) : undefined}
                                       style={{
-                                        display:'inline-flex', alignItems:'center', justifyContent:'center',
-                                        width:32, height:32, borderRadius:8, fontSize:14,
+                                        display:'inline-flex', flexDirection:'column', alignItems:'center', justifyContent:'center',
+                                        width:40, height:44, borderRadius:8, fontSize:14, lineHeight:1.2,
                                         background: isActive ? cfg.color : cfg.bg,
                                         color:      isActive ? '#fff'    : cfg.color,
                                         cursor:     cfg.cursor,
@@ -338,6 +342,9 @@ export default function OwnerFoodSafety() {
                                       }}
                                     >
                                       {cfg.tablerIcon ? <i className={`ti ${cfg.tablerIcon}`} /> : '—'}
+                                      {valueText && (
+                                        <span style={{ fontSize:10, color: isActive ? '#fff' : cfg.color, marginTop:2 }}>{valueText}</span>
+                                      )}
                                     </span>
                                   </td>
                                 )
