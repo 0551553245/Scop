@@ -269,18 +269,24 @@ export default function OwnerFoodSafety() {
                 {standards.map(std => {
                   const { icon, bg }  = getIcon(std.name, std.standard_type)
                   const isNumericStd  = std.standard_type !== 'compliance'
-                  const sub           = fsSubmissions.find(s => s.standard_id === std.id)
-                  const isPassed    = sub?.result === 'pass'
-                  const isFailed    = sub?.result === 'fail'
-                  const isPending   = !sub
-                  const cardBg      = isPassed ? '#F0FDF4' : isFailed ? '#FFF1F2' : '#fff'
-                  const borderColor = isPassed ? '#1B4332' : isFailed ? '#E24B4A' : '#F59E0B'
-                  const mgr  = sub ? (isAr ? sub.users?.name_ar || sub.users?.name : sub.users?.name || '—') : null
-                  const time = sub ? new Date(sub.submitted_at).toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit', hour12:true }) : null
+                  const subsForStd    = fsSubmissions.filter(s => s.standard_id === std.id)
+                  const applicableBranches = branches.filter(b => std.branch_id === null || std.branch_id === b.id)
+                  const branchRows = applicableBranches.map(b => ({
+                    branch: b,
+                    sub: subsForStd.find(s => s.branch_id === b.id) || null,
+                  }))
+                  const hasBreakdown = applicableBranches.length > 0
+                  const failedCount  = subsForStd.filter(s => s.result === 'fail').length
+                  const pendingCount = Math.max(0, applicableBranches.length - subsForStd.length)
+                  const isFailed  = failedCount > 0
+                  const isPending = pendingCount > 0
+                  const isPassed  = !isFailed && !isPending && hasBreakdown
+                  const cardBg      = isFailed ? '#FFF1F2' : isPassed ? '#F0FDF4' : '#fff'
+                  const borderColor = isFailed ? '#E24B4A' : isPassed ? '#1B4332' : '#F59E0B'
                   return (
                     <div key={std.id}>
                       <div
-                        style={{ background:cardBg, border:'1px solid #E5E7EB', borderLeft:`4px solid ${borderColor}`, borderRadius: sub?'14px 14px 0 0':14, padding:'14px 16px', display:'flex', alignItems:'center', gap:12, transition:'all 0.15s' }}
+                        style={{ background:cardBg, border:'1px solid #E5E7EB', borderLeft:`4px solid ${borderColor}`, borderRadius: hasBreakdown?'14px 14px 0 0':14, padding:'14px 16px', display:'flex', alignItems:'center', gap:12, transition:'all 0.15s' }}
                         onMouseEnter={e=>e.currentTarget.style.boxShadow='0 2px 8px rgba(0,0,0,0.06)'}
                         onMouseLeave={e=>e.currentTarget.style.boxShadow='none'}
                       >
@@ -296,19 +302,21 @@ export default function OwnerFoodSafety() {
                             <span style={{ fontSize:10, color:'#9CA3AF', display:'flex', alignItems:'center', gap:3 }}>
                               🏪 {getBranchName(std.branch_id)}
                             </span>
-                            {isPassed && (
-                              <span style={{ fontSize:10, fontWeight:600, padding:'2px 8px', borderRadius:20, background:'#D1FAE5', color:'#065F46' }}>
-                                ✓ {isAr?'ناجح':'Pass'}{sub.actual_value != null ? ` · ${formatActualValue(std, sub.actual_value)}` : ''}{mgr ? ` · ${mgr}` : ''}
-                              </span>
-                            )}
                             {isFailed && (
                               <span style={{ fontSize:10, fontWeight:600, padding:'2px 8px', borderRadius:20, background:'#FEE2E2', color:'#991B1B' }}>
-                                ✗ {isAr?'فاشل':'Fail'}{sub.actual_value != null ? ` · ${formatActualValue(std, sub.actual_value)}` : ''}{mgr ? ` · ${mgr}` : ''}
+                                ✗ {isAr?'فاشل':'Fail'}{applicableBranches.length>1?` (${failedCount})`:''}
                               </span>
                             )}
-                            {isPending && (
+                            {!isFailed && isPassed && (
+                              <span style={{ fontSize:10, fontWeight:600, padding:'2px 8px', borderRadius:20, background:'#D1FAE5', color:'#065F46' }}>
+                                ✓ {isAr?'ناجح':'Pass'}
+                              </span>
+                            )}
+                            {!isFailed && isPending && (
                               <span style={{ fontSize:10, fontWeight:600, padding:'2px 8px', borderRadius:20, background:'#FEF3C7', color:'#92400E' }}>
-                                {isAr?'لم يُرسل':'Not submitted'}
+                                {applicableBranches.length>1
+                                  ? `${subsForStd.length}/${applicableBranches.length} ${isAr?'مُرسل':'submitted'}`
+                                  : (isAr?'لم يُرسل':'Not submitted')}
                               </span>
                             )}
                           </div>
@@ -319,18 +327,41 @@ export default function OwnerFoodSafety() {
                           onMouseLeave={e=>e.target.style.color='#D1D5DB'}
                         >✕</button>
                       </div>
-                      {sub && (
-                        <div style={{ background: isPassed?'#F0FDF4':'#FFF1F2', border:'1px solid #E5E7EB', borderTop:'none', borderRadius:'0 0 14px 14px', padding:'10px 16px', display:'flex', flexDirection:'column', gap:4 }}>
-                          <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
-                            <span style={{ fontSize:11, fontWeight:600, color: isPassed?'#1B4332':'#9F1239' }}>{mgr}</span>
-                            <span style={{ fontSize:11, color:'#9CA3AF' }}>· {time}</span>
-                            {sub.actual_value != null && (
-                              <span style={{ fontSize:10, fontWeight:600, padding:'1px 7px', borderRadius:10, background: isPassed?'#D1FAE5':'#FEE2E2', color: isPassed?'#065F46':'#991B1B' }}>{std.standard_type==='weight'?'⚖️':'🌡'} {formatActualValue(std, sub.actual_value)}</span>
-                            )}
-                          </div>
-                          {sub.corrective_note && (
-                            <div style={{ fontSize:11, color:'#374151', fontStyle:'italic' }}>"{sub.corrective_note}"</div>
-                          )}
+                      {hasBreakdown && (
+                        <div style={{ background:'#fff', border:'1px solid #E5E7EB', borderTop:'none', borderRadius:'0 0 14px 14px', padding:'10px 16px', display:'flex', flexDirection:'column', gap:8 }}>
+                          {branchRows.map(({ branch, sub }) => {
+                            const bName   = isAr ? branch.name_ar || branch.name : branch.name
+                            const bPassed = sub?.result === 'pass'
+                            const mgr     = sub ? (isAr ? sub.users?.name_ar || sub.users?.name : sub.users?.name || '—') : null
+                            const time    = sub ? new Date(sub.submitted_at).toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit', hour12:true }) : null
+                            return (
+                              <div key={branch.id} style={{ display:'flex', flexDirection:'column', gap:2 }}>
+                                <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+                                  <span style={{ fontSize:11, fontWeight:600, color:'#111827' }}>🏪 {bName}</span>
+                                  {sub ? (
+                                    <>
+                                      <span style={{ fontSize:10, fontWeight:600, padding:'1px 7px', borderRadius:10, background: bPassed?'#D1FAE5':'#FEE2E2', color: bPassed?'#065F46':'#991B1B' }}>
+                                        {bPassed ? `✓ ${isAr?'ناجح':'Pass'}` : `✗ ${isAr?'فاشل':'Fail'}`}
+                                      </span>
+                                      {sub.actual_value != null && (
+                                        <span style={{ fontSize:10, fontWeight:600, padding:'1px 7px', borderRadius:10, background: bPassed?'#D1FAE5':'#FEE2E2', color: bPassed?'#065F46':'#991B1B' }}>
+                                          {std.standard_type==='weight'?'⚖️':'🌡'} {formatActualValue(std, sub.actual_value)}
+                                        </span>
+                                      )}
+                                      <span style={{ fontSize:11, color:'#9CA3AF' }}>{mgr} · {time}</span>
+                                    </>
+                                  ) : (
+                                    <span style={{ fontSize:10, fontWeight:600, padding:'1px 7px', borderRadius:10, background:'#FEF3C7', color:'#92400E' }}>
+                                      {isAr?'لم يُرسل':'Not submitted'}
+                                    </span>
+                                  )}
+                                </div>
+                                {sub?.corrective_note && (
+                                  <div style={{ fontSize:11, color:'#374151', fontStyle:'italic' }}>"{sub.corrective_note}"</div>
+                                )}
+                              </div>
+                            )
+                          })}
                         </div>
                       )}
                     </div>
