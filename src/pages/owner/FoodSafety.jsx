@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, Fragment } from 'react'
 import { useIsMobile } from '../../hooks/useIsMobile'
 import { supabaseOwner } from '../../lib/supabase'
 import { useOwnerAuth } from '../../context/OwnerAuthContext'
@@ -16,16 +16,6 @@ const TEMPLATES = [
   { icon:'📦', name:'Food Storage Check',    nameAr:'فحص تخزين الغذاء',   type:'compliance',  minTemp:null,maxTemp:null, unit:null },
   { icon:'✏️', name:'',                      nameAr:'',                    type:'temperature', minTemp:null,maxTemp:null, unit:'°C' },
 ]
-
-function getIcon(name, type) {
-  if (type === 'weight') return { icon:'⚖️', bg:'#FFFBEB' }
-  const n = (name || '').toLowerCase()
-  if (n.includes('fridge') || n.includes('ثلاجة')) return { icon:'🧊', bg:'#EFF6FF' }
-  if (n.includes('freezer') || n.includes('مجمد')) return { icon:'❄️', bg:'#EFF6FF' }
-  if (n.includes('hot') || n.includes('ساخن'))    return { icon:'🔥', bg:'#FFF7ED' }
-  if (n.includes('storage') || n.includes('تخزين')) return { icon:'📦', bg:'#ECFDF5' }
-  return { icon:'🛡', bg:'#F0FDF4' }
-}
 
 function getRangeLabel(std, isAr) {
   const unit   = std.standard_type === 'weight' ? (std.unit || 'kg') : '°C'
@@ -52,6 +42,7 @@ export default function OwnerFoodSafety() {
   const [branches,      setBranches]      = useState([])
   const [loading,       setLoading]       = useState(true)
   const [error,         setError]         = useState('')
+  const [selectedCell,  setSelectedCell]  = useState(null) // { standardId, branchId }
 
   // Form state
   const [tplIdx,    setTplIdx]    = useState(null)
@@ -201,10 +192,11 @@ export default function OwnerFoodSafety() {
     }
   }
 
-  function getBranchName(branchId) {
-    if (!branchId) return isAr ? 'جميع الفروع' : 'All Branches'
-    const b = branches.find(b => b.id === branchId)
-    return isAr ? b?.name_ar || b?.name : b?.name || '—'
+  function cellStatus(std, branchId) {
+    if (std.branch_id !== null && std.branch_id !== branchId) return 'none'
+    const sub = fsSubmissions.find(s => s.standard_id === std.id && s.branch_id === branchId)
+    if (!sub) return 'pending'
+    return sub.result === 'pass' ? 'done' : 'missed'
   }
 
   const emptyHintAr = isMobile
@@ -265,108 +257,137 @@ export default function OwnerFoodSafety() {
                 <div style={{ fontSize:13, color:'#6B7280' }}>{isAr ? emptyHintAr : emptyHintEn}</div>
               </div>
             ) : (
-              <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                {standards.map(std => {
-                  const { icon, bg }  = getIcon(std.name, std.standard_type)
-                  const isNumericStd  = std.standard_type !== 'compliance'
-                  const subsForStd    = fsSubmissions.filter(s => s.standard_id === std.id)
-                  const applicableBranches = branches.filter(b => std.branch_id === null || std.branch_id === b.id)
-                  const branchRows = applicableBranches.map(b => ({
-                    branch: b,
-                    sub: subsForStd.find(s => s.branch_id === b.id) || null,
-                  }))
-                  const hasBreakdown = applicableBranches.length > 0
-                  const failedCount  = subsForStd.filter(s => s.result === 'fail').length
-                  const pendingCount = Math.max(0, applicableBranches.length - subsForStd.length)
-                  const isFailed  = failedCount > 0
-                  const isPending = pendingCount > 0
-                  const isPassed  = !isFailed && !isPending && hasBreakdown
-                  const cardBg      = isFailed ? '#FFF1F2' : isPassed ? '#F0FDF4' : '#fff'
-                  const borderColor = isFailed ? '#E24B4A' : isPassed ? '#1B4332' : '#F59E0B'
-                  return (
-                    <div key={std.id}>
-                      <div
-                        style={{ background:cardBg, border:'1px solid #E5E7EB', borderLeft:`4px solid ${borderColor}`, borderRadius: hasBreakdown?'14px 14px 0 0':14, padding:'14px 16px', display:'flex', alignItems:'center', gap:12, transition:'all 0.15s' }}
-                        onMouseEnter={e=>e.currentTarget.style.boxShadow='0 2px 8px rgba(0,0,0,0.06)'}
-                        onMouseLeave={e=>e.currentTarget.style.boxShadow='none'}
-                      >
-                        <div style={{ width:36, height:36, borderRadius:8, background:bg, display:'flex', alignItems:'center', justifyContent:'center', fontSize:17, flexShrink:0 }}>{icon}</div>
-                        <div style={{ flex:1, minWidth:0 }}>
-                          <div style={{ fontSize:13, fontWeight:600, color:'#111827', marginBottom:3 }}>
-                            {isAr ? std.name_ar || std.name : std.name}
-                          </div>
-                          <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
-                            <span style={{ fontSize:10, fontWeight:600, padding:'2px 8px', borderRadius:20, background: std.standard_type==='weight'?'#FFFBEB':isNumericStd?'#EFF6FF':'#F0FDF4', color: std.standard_type==='weight'?'#B45309':isNumericStd?'#1D4ED8':'#166534' }}>
-                              {isNumericStd ? getRangeLabel(std, isAr) : (isAr?'فحص امتثال':'Compliance')}
-                            </span>
-                            <span style={{ fontSize:10, color:'#9CA3AF', display:'flex', alignItems:'center', gap:3 }}>
-                              🏪 {getBranchName(std.branch_id)}
-                            </span>
-                            {isFailed && (
-                              <span style={{ fontSize:10, fontWeight:600, padding:'2px 8px', borderRadius:20, background:'#FEE2E2', color:'#991B1B' }}>
-                                ✗ {isAr?'فاشل':'Fail'}{applicableBranches.length>1?` (${failedCount})`:''}
-                              </span>
-                            )}
-                            {!isFailed && isPassed && (
-                              <span style={{ fontSize:10, fontWeight:600, padding:'2px 8px', borderRadius:20, background:'#D1FAE5', color:'#065F46' }}>
-                                ✓ {isAr?'ناجح':'Pass'}
-                              </span>
-                            )}
-                            {!isFailed && isPending && (
-                              <span style={{ fontSize:10, fontWeight:600, padding:'2px 8px', borderRadius:20, background:'#FEF3C7', color:'#92400E' }}>
-                                {applicableBranches.length>1
-                                  ? `${subsForStd.length}/${applicableBranches.length} ${isAr?'مُرسل':'submitted'}`
-                                  : (isAr?'لم يُرسل':'Not submitted')}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        <button onClick={()=>handleDelete(std.id)}
-                          style={{ background:'none', border:'none', cursor:'pointer', color:'#D1D5DB', fontSize:16, padding:4, borderRadius:8, transition:'color 0.15s' }}
-                          onMouseEnter={e=>e.target.style.color='#F43F5E'}
-                          onMouseLeave={e=>e.target.style.color='#D1D5DB'}
-                        >✕</button>
-                      </div>
-                      {hasBreakdown && (
-                        <div style={{ background:'#fff', border:'1px solid #E5E7EB', borderTop:'none', borderRadius:'0 0 14px 14px', padding:'10px 16px', display:'flex', flexDirection:'column', gap:8 }}>
-                          {branchRows.map(({ branch, sub }) => {
-                            const bName   = isAr ? branch.name_ar || branch.name : branch.name
-                            const bPassed = sub?.result === 'pass'
-                            const mgr     = sub ? (isAr ? sub.users?.name_ar || sub.users?.name : sub.users?.name || '—') : null
-                            const time    = sub ? new Date(sub.submitted_at).toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit', hour12:true }) : null
-                            return (
-                              <div key={branch.id} style={{ display:'flex', flexDirection:'column', gap:2 }}>
-                                <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
-                                  <span style={{ fontSize:11, fontWeight:600, color:'#111827' }}>🏪 {bName}</span>
-                                  {sub ? (
-                                    <>
-                                      <span style={{ fontSize:10, fontWeight:600, padding:'1px 7px', borderRadius:10, background: bPassed?'#D1FAE5':'#FEE2E2', color: bPassed?'#065F46':'#991B1B' }}>
-                                        {bPassed ? `✓ ${isAr?'ناجح':'Pass'}` : `✗ ${isAr?'فاشل':'Fail'}`}
+              <div style={{ background:'#fff', border:'1px solid #E5E7EB', borderRadius:12, overflow:'hidden' }}>
+                <div style={{ overflowX:'auto', width:'100%' }}>
+                  <table style={{ width:'100%', borderCollapse:'collapse', minWidth: Math.max(500, branches.length * 120 + 220) }}>
+                    <thead>
+                      <tr style={{ background:'#F9FAFB', borderBottom:'1px solid #E5E7EB' }}>
+                        <th style={{ padding:'10px 16px', textAlign: isAr ? 'right' : 'left', fontSize:11, fontWeight:700, color:'#6B7280', whiteSpace:'nowrap', minWidth:180, position:'sticky', left:0, background:'#F9FAFB', zIndex:2, borderRight:'0.5px solid #E5E7EB' }}>
+                          {isAr ? 'المعيار' : 'Standard'}
+                        </th>
+                        {branches.map(b => (
+                          <th key={b.id} style={{ padding:'10px 14px', textAlign:'center', fontSize:12, fontWeight:600, color:'#111827', minWidth:100, whiteSpace:'nowrap', background:'#F9FAFB', borderBottom:'0.5px solid #E5E7EB' }}>
+                            {isAr ? b.name_ar || b.name : b.name}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {standards.map(std => {
+                        const isNumericStd = std.standard_type !== 'compliance'
+                        const typeBadge = std.standard_type==='weight' ? { bg:'#FFFBEB', color:'#B45309', label:isAr?'وزن':'Weight' }
+                                        : isNumericStd                 ? { bg:'#EFF6FF', color:'#1D4ED8', label:isAr?'حرارة':'Temp' }
+                                        :                                 { bg:'#F0FDF4', color:'#166534', label:isAr?'امتثال':'Check' }
+                        const isExpRow = selectedCell?.standardId === std.id
+                        const expSub   = isExpRow ? fsSubmissions.find(s => s.standard_id === std.id && s.branch_id === selectedCell.branchId) : null
+                        return (
+                          <Fragment key={std.id}>
+                            <tr style={{ borderBottom: isExpRow ? 'none' : '0.5px solid #F3F4F6' }}>
+                              <td style={{ padding:'9px 16px', fontSize:13, fontWeight:500, color:'#111827', position:'sticky', left:0, background:'#fff', zIndex:1, borderRight:'0.5px solid #E5E7EB', minWidth:180 }}>
+                                <div style={{ display:'flex', alignItems:'center', gap:6, minWidth:0 }}>
+                                  <div style={{ flex:1, minWidth:0 }}>
+                                    <div style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', marginBottom:2 }}>
+                                      {isAr ? std.name_ar || std.name : std.name}
+                                    </div>
+                                    <div style={{ display:'flex', alignItems:'center', gap:4, flexWrap:'wrap' }}>
+                                      <span style={{ fontSize:9, fontWeight:600, padding:'1px 6px', borderRadius:20, background:typeBadge.bg, color:typeBadge.color }}>
+                                        {typeBadge.label}
                                       </span>
-                                      {sub.actual_value != null && (
-                                        <span style={{ fontSize:10, fontWeight:600, padding:'1px 7px', borderRadius:10, background: bPassed?'#D1FAE5':'#FEE2E2', color: bPassed?'#065F46':'#991B1B' }}>
-                                          {std.standard_type==='weight'?'⚖️':'🌡'} {formatActualValue(std, sub.actual_value)}
-                                        </span>
-                                      )}
-                                      <span style={{ fontSize:11, color:'#9CA3AF' }}>{mgr} · {time}</span>
-                                    </>
-                                  ) : (
-                                    <span style={{ fontSize:10, fontWeight:600, padding:'1px 7px', borderRadius:10, background:'#FEF3C7', color:'#92400E' }}>
-                                      {isAr?'لم يُرسل':'Not submitted'}
-                                    </span>
-                                  )}
+                                      <span style={{ fontSize:10, color:'#9CA3AF' }}>
+                                        {isNumericStd ? getRangeLabel(std, isAr) : (isAr?'فحص امتثال':'Compliance check')}
+                                      </span>
+                                    </div>
+                                  </div>
+                                  <button
+                                    onClick={() => handleDelete(std.id)}
+                                    style={{ background:'none', border:'none', cursor:'pointer', color:'#D1D5DB', fontSize:10, padding:'2px 4px', fontFamily:'inherit', flexShrink:0, lineHeight:1 }}
+                                    onMouseEnter={e => e.currentTarget.style.color = '#F43F5E'}
+                                    onMouseLeave={e => e.currentTarget.style.color = '#D1D5DB'}
+                                    title={isAr ? 'حذف' : 'Delete'}
+                                  >✕</button>
                                 </div>
-                                {sub?.corrective_note && (
-                                  <div style={{ fontSize:11, color:'#374151', fontStyle:'italic' }}>"{sub.corrective_note}"</div>
-                                )}
-                              </div>
-                            )
-                          })}
-                        </div>
-                      )}
+                              </td>
+
+                              {branches.map(branch => {
+                                const status   = cellStatus(std, branch.id)
+                                const isActive = selectedCell?.standardId === std.id && selectedCell?.branchId === branch.id
+                                const CELL_CFG = {
+                                  done:    { bg:'#F0FDF4', border:'#BBF7D0', color:'#1B4332', tablerIcon:'ti-check',     cursor:'pointer' },
+                                  missed:  { bg:'#FEF2F2', border:'#FECACA', color:'#DC2626', tablerIcon:'ti-x',         cursor:'pointer' },
+                                  pending: { bg:'#FFFBEB', border:'#FDE68A', color:'#92400E', tablerIcon:'ti-hourglass', cursor:'default' },
+                                  none:    { bg:'#F3F4F6', border:'#E5E7EB', color:'#D1D5DB', tablerIcon:null,           cursor:'default' },
+                                }
+                                const cfg       = CELL_CFG[status] || CELL_CFG.none
+                                const clickable = status === 'done' || status === 'missed'
+                                return (
+                                  <td key={branch.id} style={{ padding:'6px', textAlign:'center' }}>
+                                    <span
+                                      onClick={clickable ? () => setSelectedCell(prev =>
+                                        prev?.standardId === std.id && prev?.branchId === branch.id
+                                          ? null
+                                          : { standardId: std.id, branchId: branch.id }
+                                      ) : undefined}
+                                      style={{
+                                        display:'inline-flex', alignItems:'center', justifyContent:'center',
+                                        width:32, height:32, borderRadius:8, fontSize:14,
+                                        background: isActive ? cfg.color : cfg.bg,
+                                        color:      isActive ? '#fff'    : cfg.color,
+                                        cursor:     cfg.cursor,
+                                        border:     `0.5px solid ${isActive ? cfg.color : cfg.border}`,
+                                        transition: 'all 0.15s',
+                                      }}
+                                    >
+                                      {cfg.tablerIcon ? <i className={`ti ${cfg.tablerIcon}`} /> : '—'}
+                                    </span>
+                                  </td>
+                                )
+                              })}
+                            </tr>
+                            {isExpRow && expSub && (
+                              <tr>
+                                <td colSpan={branches.length + 1} style={{ padding:'12px 16px', background: expSub.result==='pass'?'#F0FDF4':'#FFF1F2', borderBottom:'1px solid #E5E7EB', borderTop: expSub.result==='pass'?'1px solid #BBF7D0':'1px solid #FECDD3' }}>
+                                  <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+                                    <span style={{ fontSize:11, fontWeight:600, color: expSub.result==='pass'?'#1B4332':'#9F1239' }}>
+                                      {isAr ? expSub.users?.name_ar || expSub.users?.name : expSub.users?.name || '—'}
+                                    </span>
+                                    <span style={{ fontSize:11, color:'#9CA3AF' }}>
+                                      · {new Date(expSub.submitted_at).toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit', hour12:true })}
+                                    </span>
+                                    {expSub.actual_value != null && (
+                                      <span style={{ fontSize:10, fontWeight:600, padding:'1px 7px', borderRadius:10, background: expSub.result==='pass'?'#D1FAE5':'#FEE2E2', color: expSub.result==='pass'?'#065F46':'#991B1B' }}>
+                                        {std.standard_type==='weight'?'⚖️':'🌡'} {formatActualValue(std, expSub.actual_value)}
+                                      </span>
+                                    )}
+                                    {expSub.corrective_note && (
+                                      <span style={{ fontSize:11, color:'#374151', fontStyle:'italic' }}>"{expSub.corrective_note}"</span>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                            )}
+                          </Fragment>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Legend */}
+                <div style={{ padding:'10px 16px', borderTop:'1px solid #F3F4F6', display:'flex', gap:16, flexWrap:'wrap', alignItems:'center' }}>
+                  {[
+                    { tablerIcon:'ti-check',     bg:'#F0FDF4', color:'#1B4332', label:'Pass',           labelAr:'ناجح'      },
+                    { tablerIcon:'ti-hourglass', bg:'#FFFBEB', color:'#92400E', label:'Not submitted',  labelAr:'لم يُرسل'  },
+                    { tablerIcon:'ti-x',         bg:'#FEF2F2', color:'#DC2626', label:'Fail',           labelAr:'فاشل'      },
+                    { tablerIcon:null,           bg:'#F3F4F6', color:'#D1D5DB', label:'Not applicable', labelAr:'غير مطبق'  },
+                  ].map(l => (
+                    <div key={l.label} style={{ display:'flex', alignItems:'center', gap:5 }}>
+                      <span style={{ width:22, height:22, borderRadius:6, background:l.bg, color:l.color, fontSize:12, display:'inline-flex', alignItems:'center', justifyContent:'center', border:'1px solid #E5E7EB' }}>
+                        {l.tablerIcon ? <i className={`ti ${l.tablerIcon}`} /> : '—'}
+                      </span>
+                      <span style={{ fontSize:11, color:'#6B7280' }}>{isAr ? l.labelAr : l.label}</span>
                     </div>
-                  )
-                })}
+                  ))}
+                </div>
               </div>
             )}
           </div>
