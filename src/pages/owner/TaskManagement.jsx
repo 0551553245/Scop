@@ -8,6 +8,7 @@ import { useSubscription } from '../../hooks/useSubscription'
 import { calcRate } from '../../lib/stats'
 import SubscriptionGuard from '../../components/SubscriptionGuard'
 import OwnerLayout from '../../components/OwnerLayout'
+import ErrorBanner from '../../components/ErrorBanner'
 
 const TEMPLATES = [
   { icon:'🌅', name:'Opening Checklist',  nameAr:'قائمة الافتتاح',    freq:'daily',   category:'opening'     },
@@ -337,14 +338,7 @@ export default function OwnerTaskManagement() {
               </button>
             )}
 
-            {error && (
-              <div style={{ background:'#FFF1F2', border:'1px solid #FECDD3', borderRadius:12, padding:'12px 16px', marginBottom:16, color:'#9F1239', fontSize:13, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-                <span>{error}</span>
-                <button onClick={fetchData} style={{ background:'none', border:'none', color:'#9F1239', fontSize:12, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>
-                  {isAr ? 'إعادة المحاولة' : 'Retry'}
-                </button>
-              </div>
-            )}
+            <ErrorBanner message={error} isAr={isAr} onRetry={fetchData} />
 
             {tasks.length === 0 ? (
               <div style={{ background:'#fff', border:'1px solid #E5E7EB', borderRadius:18, padding:40, textAlign:'center', marginTop:20 }}>

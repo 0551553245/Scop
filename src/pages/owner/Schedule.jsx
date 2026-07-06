@@ -7,6 +7,7 @@ import { useLanguage } from '../../context/LanguageContext'
 import SubscriptionGuard from '../../components/SubscriptionGuard'
 import NotificationBell from '../../components/NotificationBell'
 import OwnerLayout from '../../components/OwnerLayout'
+import ErrorBanner from '../../components/ErrorBanner'
 
 // ── CATEGORIES ─────────────────────────────────────────────────
 const CATS = [
@@ -224,14 +225,11 @@ export default function OwnerSchedule() {
       topbarRight={scheduleTopbarRight} branches={branches}>
 
       {/* Error banner */}
-        {error && (
-          <div style={{ margin: '10px 20px 0', padding: '10px 16px', background: '#FFF1F2', border: '1px solid #FECDD3', borderRadius: 10, fontSize: 13, color: '#E24B4A', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
-            {error}
-            <button onClick={fetchData} style={{ fontSize: 12, color: '#E24B4A', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>
-              {isAr ? 'إعادة' : 'Retry'}
-            </button>
-          </div>
-        )}
+      {error && (
+        <div style={{ margin: '10px 20px 0' }}>
+          <ErrorBanner message={error} isAr={isAr} onRetry={fetchData} />
+        </div>
+      )}
 
       {/* Content: calendar + form */}
       <div style={{ height: '100%', overflow: 'hidden', padding: isMobile ? 0 : '16px 20px', display: 'flex', gap: isMobile ? 0 : 14, minHeight: 0 }}>
