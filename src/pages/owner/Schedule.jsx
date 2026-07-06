@@ -294,7 +294,15 @@ export default function OwnerSchedule() {
             </div>
 
             {/* Scrollable hourly grid */}
-            <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
+            <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, position: 'relative' }}>
+              {events.length === 0 && (
+                <div style={{ position: 'absolute', inset: 0, zIndex: 20, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none', textAlign: 'center', padding: 20 }}>
+                  <i className="ti ti-calendar-off" style={{ fontSize: 32, color: '#9CA3AF', marginBottom: 10 }} />
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>
+                    {isAr ? 'لا توجد أحداث مجدولة لهذا الأسبوع' : 'No events scheduled for this week'}
+                  </div>
+                </div>
+              )}
               <div dir="ltr" style={{ display: 'grid', gridTemplateColumns: '52px repeat(7, 1fr)', height: GRID_H, position: 'relative' }}>
 
                 {/* Time labels */}

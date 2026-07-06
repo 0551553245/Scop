@@ -245,6 +245,13 @@ export default function BMSchedule() {
     <BMLayout activePath="/branch-manager/schedule" title="Schedule" titleAr="الجدول"
       subtitle={weekLabel} branchName={branchName}>
 
+      {error && (
+        <div style={{ margin:'16px 16px 0', background:'#FFF1F2', border:'0.5px solid #FECDD3', borderRadius:10, padding:'10px 14px', color:'#9F1239', fontSize:12, display:'flex', alignItems:'center', justifyContent:'space-between', gap:10 }}>
+          <span>{error}</span>
+          <button onClick={fetchEvents} style={{ background:'none', border:'1px solid #FECDD3', borderRadius:8, padding:'3px 8px', color:'#9F1239', fontSize:11, cursor:'pointer', flexShrink:0 }}>{isAr?'إعادة':'Retry'}</button>
+        </div>
+      )}
+
       {isMobile ? (
 
         /* ── MOBILE LAYOUT ─────────────────────────────────────── */
