@@ -5,6 +5,7 @@ import { useAdminAuth } from '../../context/AdminAuthContext'
 import { useLanguage } from '../../context/LanguageContext'
 import { getPlatformSettings, getPlanLimits } from '../../lib/platformSettings'
 import AdminLayout from '../../components/AdminLayout'
+import ErrorBanner from '../../components/ErrorBanner'
 import { formatDate, daysLeft, calculateExpiry } from '../../lib/adminHelpers'
 
 const PLAN_BADGE = {
@@ -566,9 +567,7 @@ export default function AdminRestaurants() {
           {/* ── OWNERS TAB ── */}
           {activeTab === 'owners' && (
             <>
-              {error && (
-                <div style={{ background:'#FFF1F2', border:'0.5px solid #FECDD3', borderRadius:12, padding:'12px 16px', marginBottom:16, color:'#9F1239', fontSize:13 }}>{error}</div>
-              )}
+              <ErrorBanner message={error} isAr={isAr} />
 
               <div style={{ background:'#fff', border:'0.5px solid #E5E7EB', borderRadius:12, padding:20, marginBottom:16 }}>
                 {loading ? (

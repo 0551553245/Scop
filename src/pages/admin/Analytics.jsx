@@ -5,6 +5,7 @@ import { useAdminAuth } from '../../context/AdminAuthContext'
 import { useLanguage } from '../../context/LanguageContext'
 import { calcRate } from '../../lib/stats'
 import AdminLayout from '../../components/AdminLayout'
+import ErrorBanner from '../../components/ErrorBanner'
 
 function dayKey(d) { return new Date(d).toISOString().split('T')[0] }
 
@@ -149,9 +150,7 @@ export default function AdminAnalytics() {
     }>
       <div style={{ padding:'20px 24px' }}>
 
-          {error && (
-            <div style={{ background:'#FFF1F2', border:'0.5px solid #FECDD3', borderRadius:12, padding:'12px 16px', marginBottom:16, color:'#9F1239', fontSize:13 }}>{error}</div>
-          )}
+          <ErrorBanner message={error} isAr={isAr} />
 
           {/* KPI cards */}
           <div style={{ display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:14, marginBottom:20 }}>

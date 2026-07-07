@@ -5,6 +5,7 @@ import { useAdminAuth } from '../../context/AdminAuthContext'
 import { useLanguage } from '../../context/LanguageContext'
 import { invalidateSettingsCache } from '../../lib/platformSettings'
 import AdminLayout from '../../components/AdminLayout'
+import ErrorBanner from '../../components/ErrorBanner'
 
 const inputStyle = {
   width:'100%', padding:'9px 12px', fontSize:13,
@@ -142,9 +143,7 @@ export default function AdminSettings() {
     }>
       <div style={{ padding:'20px 24px' }}>
 
-          {error && (
-            <div style={{ background:'#FFF1F2', border:'0.5px solid #FECDD3', borderRadius:12, padding:'12px 16px', marginBottom:16, color:'#9F1239', fontSize:13 }}>{error}</div>
-          )}
+          <ErrorBanner message={error} isAr={isAr} />
           {saveMsg && (
             <div style={{ background: saveMsg.includes('error') || saveMsg.includes('خطأ') ? '#FFF1F2' : '#F0FDF4', border:'0.5px solid #BBF7D0', borderRadius:12, padding:'12px 16px', marginBottom:16, color:'#166534', fontSize:13 }}>{saveMsg}</div>
           )}

@@ -7,6 +7,7 @@ import { useSubscription } from '../../hooks/useSubscription'
 import SubscriptionBanner from '../../components/SubscriptionBanner'
 import { getPlatformSettings, getPlanLimits, DEFAULT_SETTINGS } from '../../lib/platformSettings'
 import OwnerLayout from '../../components/OwnerLayout'
+import ErrorBanner from '../../components/ErrorBanner'
 import { useIsMobile } from '../../hooks/useIsMobile'
 
 const PLAN_FEATURES = {
@@ -188,14 +189,7 @@ export default function OwnerSubscription() {
           supportWhatsapp={whatsappNumber}
         />
 
-        {error && (
-          <div style={{ background:'#FFF1F2', border:'1px solid #FECDD3', borderRadius:12, padding:'12px 16px', marginBottom:16, color:'#9F1239', fontSize:13, display:'flex', alignItems:'center', justifyContent:'space-between', gap:12 }}>
-            <span>{error}</span>
-            <button onClick={fetchExtra} style={{ background:'none', border:'1px solid #FECDD3', borderRadius:8, padding:'4px 12px', color:'#9F1239', fontSize:12, fontWeight:500, cursor:'pointer', flexShrink:0, fontFamily:'inherit' }}>
-              {isAr ? 'إعادة المحاولة' : 'Retry'}
-            </button>
-          </div>
-        )}
+        <ErrorBanner message={error} isAr={isAr} onRetry={fetchExtra} />
 
         {!subscription ? (
           <div style={{ background:'#fff', border:'1px solid #E5E7EB', borderRadius:18, padding:40, textAlign:'center' }}>

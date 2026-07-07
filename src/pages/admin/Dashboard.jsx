@@ -7,6 +7,7 @@ import { getCached, setCached, invalidateCache } from '../../lib/cache'
 import { calcRate } from '../../lib/stats'
 import { getPlanLimits } from '../../lib/platformSettings'
 import AdminLayout from '../../components/AdminLayout'
+import ErrorBanner from '../../components/ErrorBanner'
 import { daysLeft } from '../../lib/adminHelpers'
 
 // ─── helpers ────────────────────────────────────────────────────────────────
@@ -339,14 +340,7 @@ export default function AdminDashboard() {
       <div style={{ padding:'20px 24px', display:'flex', flexDirection:'column', gap:16 }}>
 
           {/* error */}
-          {error && (
-            <div style={{ background:'#FFF1F2', border:'0.5px solid #FECDD3', borderRadius:12, padding:'12px 16px', color:'#9F1239', fontSize:13, display:'flex', alignItems:'center', justifyContent:'space-between', gap:12 }}>
-              <span>{error}</span>
-              <button onClick={fetchDashboard} style={{ background:'none', border:'0.5px solid #FECDD3', borderRadius:8, padding:'4px 10px', color:'#9F1239', fontSize:12, cursor:'pointer', fontFamily:'inherit' }}>
-                {isAr ? 'إعادة المحاولة' : 'Retry'}
-              </button>
-            </div>
-          )}
+          <ErrorBanner message={error} isAr={isAr} onRetry={fetchDashboard} />
 
           {/* ── ROW 1 — 4 KPI cards ─────────────────────────────────────── */}
           <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12 }}>
