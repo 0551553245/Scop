@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabaseAdmin } from '../../lib/supabase'
 import { useAdminAuth } from '../../context/AdminAuthContext'
 import { useLanguage } from '../../context/LanguageContext'
+import { useIsMobile } from '../../hooks/useIsMobile'
 import AdminLayout from '../../components/AdminLayout'
 import ErrorBanner from '../../components/ErrorBanner'
 import { formatDateTime } from '../../lib/adminHelpers'
@@ -31,6 +32,7 @@ export default function AdminNotifications() {
   const navigate             = useNavigate()
   const { profile, signOut } = useAdminAuth()
   const { isAr, toggleLang } = useLanguage()
+  const isMobile = useIsMobile()
 
   const [history, setHistory] = useState([])
   const [loading, setLoading] = useState(true)
@@ -142,11 +144,11 @@ export default function AdminNotifications() {
         {isAr ? 'EN' : 'ع'}
       </button>
     }>
-      <div style={{ padding:'20px 24px' }}>
+      <div style={{ padding: isMobile ? '16px' : '20px 24px' }}>
 
           <ErrorBanner message={error} isAr={isAr} />
 
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:20 }}>
+          <div style={{ display:'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: isMobile ? 16 : 20 }}>
 
             {/* Send form */}
             <div style={{ background:'#fff', border:'0.5px solid #E5E7EB', borderRadius:12, padding:20 }}>

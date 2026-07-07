@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabaseAdmin, supabaseTemp } from '../../lib/supabase'
 import { useAdminAuth } from '../../context/AdminAuthContext'
 import { useLanguage } from '../../context/LanguageContext'
+import { useIsMobile } from '../../hooks/useIsMobile'
 import { getPlatformSettings, getPlanLimits } from '../../lib/platformSettings'
 import AdminLayout from '../../components/AdminLayout'
 import ErrorBanner from '../../components/ErrorBanner'
@@ -47,6 +48,7 @@ export default function AdminRestaurants() {
   const [searchParams]        = useSearchParams()
   const { profile, signOut }  = useAdminAuth()
   const { isAr, toggleLang }  = useLanguage()
+  const isMobile = useIsMobile()
 
   const [activeTab, setActiveTab] = useState('owners')
 
@@ -494,6 +496,20 @@ export default function AdminRestaurants() {
 
   return (
     <AdminLayout currentPath="/admin/restaurants" profile={profile} isAr={isAr} handleSignOut={handleSignOut} title="Restaurants" titleAr="المطاعم" topbarRight={
+      isMobile ? (
+        <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+          <button onClick={toggleLang} style={{ fontSize:12, color:'#6B7280', background:'#F9FAFB', border:'0.5px solid #E5E7EB', padding:'4px 11px', borderRadius:20, cursor:'pointer', fontFamily:'inherit' }}>
+            {isAr ? 'EN' : 'ع'}
+          </button>
+          {activeTab === 'owners' && (
+            <button onClick={() => setShowCreate(true)}
+              aria-label={isAr ? 'مالك جديد' : 'New Owner'}
+              style={{ background:'#1B4332', color:'#fff', border:'none', borderRadius:10, cursor:'pointer', fontSize:18, fontFamily:'inherit', display:'flex', alignItems:'center', justifyContent:'center', minWidth:44, minHeight:44 }}>
+              +
+            </button>
+          )}
+        </div>
+      ) : (
       <div style={{ display:'flex', alignItems:'center', gap:8 }}>
             {activeTab === 'owners' ? (
               <>
@@ -540,8 +556,52 @@ export default function AdminRestaurants() {
               </>
             )}
       </div>
+      )
     }>
-      <div style={{ padding:'20px 24px' }}>
+      <div style={{ padding: isMobile ? '16px' : '20px 24px' }}>
+
+          {/* Mobile-only: search + filters moved out of the topbar */}
+          {isMobile && (
+            <div style={{ display:'flex', flexDirection:'column', gap:8, marginBottom:16 }}>
+              {activeTab === 'owners' ? (
+                <>
+                  <input
+                    value={search} onChange={e => { setSearch(e.target.value); setPage(0) }}
+                    placeholder={isAr ? 'بحث بالاسم أو البريد...' : 'Search name or email...'}
+                    style={{ fontSize:13, padding:'9px 12px', borderRadius:20, border:'0.5px solid #E5E7EB', outline:'none', fontFamily:'inherit', width:'100%', boxSizing:'border-box' }}
+                  />
+                  <div style={{ display:'flex', gap:8 }}>
+                    <select value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(0) }} style={{ flex:1, fontSize:12, padding:'8px 10px', borderRadius:20, border:'0.5px solid #E5E7EB', outline:'none', fontFamily:'inherit', cursor:'pointer' }}>
+                      <option value="all">{isAr ? 'كل الحالات' : 'All Status'}</option>
+                      <option value="active">{isAr ? 'نشط' : 'Active'}</option>
+                      <option value="trial">{isAr ? 'تجربة' : 'Trial'}</option>
+                      <option value="expired">{isAr ? 'منتهي' : 'Expired'}</option>
+                      <option value="blocked">{isAr ? 'محظور' : 'Blocked'}</option>
+                    </select>
+                    <select value={planFilter} onChange={e => { setPlanFilter(e.target.value); setPage(0) }} style={{ flex:1, fontSize:12, padding:'8px 10px', borderRadius:20, border:'0.5px solid #E5E7EB', outline:'none', fontFamily:'inherit', cursor:'pointer' }}>
+                      <option value="all">{isAr ? 'كل الخطط' : 'All Plans'}</option>
+                      <option value="starter">Starter</option>
+                      <option value="growth">Growth</option>
+                      <option value="pro">Pro</option>
+                    </select>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <input
+                    value={mgSearch} onChange={e => setMgSearch(e.target.value)}
+                    placeholder={isAr ? 'بحث بالاسم أو البريد...' : 'Search name or email...'}
+                    style={{ fontSize:13, padding:'9px 12px', borderRadius:20, border:'0.5px solid #E5E7EB', outline:'none', fontFamily:'inherit', width:'100%', boxSizing:'border-box' }}
+                  />
+                  <select value={mgStatusFilter} onChange={e => setMgStatusFilter(e.target.value)} style={{ fontSize:12, padding:'8px 10px', borderRadius:20, border:'0.5px solid #E5E7EB', outline:'none', fontFamily:'inherit', cursor:'pointer' }}>
+                    <option value="all">{isAr ? 'الكل' : 'All'}</option>
+                    <option value="active">{isAr ? 'نشط' : 'Active'}</option>
+                    <option value="inactive">{isAr ? 'غير نشط' : 'Inactive'}</option>
+                  </select>
+                </>
+              )}
+            </div>
+          )}
 
           {/* Tab strip */}
           <div style={{ display:'flex', marginBottom:20, borderBottom:'0.5px solid #E5E7EB' }}>
