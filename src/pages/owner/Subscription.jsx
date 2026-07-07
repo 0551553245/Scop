@@ -12,9 +12,9 @@ import { useIsMobile } from '../../hooks/useIsMobile'
 
 const PLAN_FEATURES = {
   trial:   { branches: 1,  managers: 1,  price: 0,   label: 'Free Trial', labelAr: 'تجربة مجانية' },
-  starter: { branches: 1,  managers: 1,  price: 199, label: 'Starter',    labelAr: 'المبتدئ'      },
-  growth:  { branches: 5,  managers: 5,  price: 499, label: 'Growth',     labelAr: 'النمو'         },
-  pro:     { branches: 15, managers: 99, price: 999, label: 'Pro',        labelAr: 'الاحترافي'    },
+  starter: { branches: 1,  managers: 1,  price: 99,  label: 'Starter',    labelAr: 'المبتدئ'      },
+  growth:  { branches: 5,  managers: 5,  price: 199, label: 'Growth',     labelAr: 'النمو'         },
+  pro:     { branches: 15, managers: 99, price: 399, label: 'Pro',        labelAr: 'الاحترافي'    },
 }
 
 const FEATURE_LIST = {

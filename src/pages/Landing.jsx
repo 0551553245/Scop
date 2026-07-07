@@ -97,7 +97,7 @@ const PRICING = {
   plans: [
     {
       name: { en: 'Starter', ar: 'المبتدئ' },
-      price: 199,
+      price: 99,
       desc: { en: '1 branch · 1 manager', ar: 'فرع واحد · مدير واحد' },
       features: {
         en: ['Daily & weekly tasks', 'Food safety tracking', 'Basic reports'],
@@ -107,7 +107,7 @@ const PRICING = {
     },
     {
       name: { en: 'Growth', ar: 'النمو' },
-      price: 499,
+      price: 199,
       desc: { en: '5 branches · 5 managers', ar: '5 فروع · 5 مديرين' },
       features: {
         en: ['Everything in Starter', 'Schedule & events', 'Advanced reports'],
@@ -117,7 +117,7 @@ const PRICING = {
     },
     {
       name: { en: 'Pro', ar: 'الاحترافي' },
-      price: 999,
+      price: 399,
       desc: { en: '15 branches · Unlimited managers', ar: '15 فرعاً · مديرون غير محدودون' },
       features: {
         en: ['Everything in Growth', 'Priority support', 'Custom integrations'],
@@ -133,6 +133,14 @@ const CTA_SEC = {
   sub:   { en: 'Join restaurants across Saudi Arabia managing their operations with Scop.', ar: 'انضم إلى المطاعم في جميع أنحاء المملكة العربية السعودية التي تدير عملياتها مع سكوب.' },
   cta1:  { en: 'Start free trial →', ar: 'ابدأ تجربتك المجانية ←' },
   cta2:  { en: 'Contact us', ar: 'تواصل معنا' },
+}
+
+const CONTACT = {
+  tag:      { en: 'Contact', ar: 'تواصل' },
+  title:    { en: 'Contact Us', ar: 'تواصل معنا' },
+  sub:      { en: "We're happy to help — reach out anytime.", ar: 'يسعدنا مساعدتك — تواصل معنا في أي وقت.' },
+  whatsapp: { en: 'WhatsApp', ar: 'واتساب' },
+  email:    { en: 'Email', ar: 'البريد الإلكتروني' },
 }
 
 const FOOTER = {
@@ -151,6 +159,8 @@ const ICON_PATHS = {
   building: 'M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2zM9 22V12h6v10',
   users:    'M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 7a4 4 0 100 8 4 4 0 000-8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75',
   calendar: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z',
+  mail:     'M4 4h16v16H4V4zM4 4l8 8 8-8',
+  chat:     'M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z',
 }
 
 function Icon({ name, size = 20, color = 'currentColor' }) {
@@ -490,6 +500,64 @@ export default function Landing() {
             }}
           >
             {t(CTA_SEC.cta2)}
+          </a>
+        </div>
+      </section>
+
+      {/* ── CONTACT ── */}
+      <section id="contact" style={{ background: '#F0FDF4', padding: '56px 40px' }}>
+        <div style={{ textAlign: 'center', marginBottom: 32 }}>
+          <div style={sectionTag}>{t(CONTACT.tag)}</div>
+          <h2 style={sectionTitle}>{t(CONTACT.title)}</h2>
+          <p style={sectionSub}>{t(CONTACT.sub)}</p>
+        </div>
+
+        <div style={{
+          display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap',
+          maxWidth: 600, margin: '0 auto',
+        }}>
+          <a
+            href="https://wa.me/966551553245"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: 'flex', alignItems: 'center', gap: 14,
+              background: '#fff', border: '0.5px solid #E5E7EB', borderRadius: 12,
+              padding: '18px 22px', textDecoration: 'none',
+              flex: '1 1 240px', maxWidth: 280,
+            }}
+          >
+            <div style={{
+              width: 40, height: 40, borderRadius: 10, background: '#F0FDF4',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+            }}>
+              <Icon name="chat" size={18} color="#166534" />
+            </div>
+            <div>
+              <div style={{ fontSize: 12, color: '#9CA3AF', marginBottom: 2 }}>{t(CONTACT.whatsapp)}</div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: '#111827', direction: 'ltr', textAlign: isAr ? 'right' : 'left' }}>+966 551 553 245</div>
+            </div>
+          </a>
+
+          <a
+            href="mailto:noreply@scopsa.com"
+            style={{
+              display: 'flex', alignItems: 'center', gap: 14,
+              background: '#fff', border: '0.5px solid #E5E7EB', borderRadius: 12,
+              padding: '18px 22px', textDecoration: 'none',
+              flex: '1 1 240px', maxWidth: 280,
+            }}
+          >
+            <div style={{
+              width: 40, height: 40, borderRadius: 10, background: '#EFF6FF',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+            }}>
+              <Icon name="mail" size={18} color="#1D4ED8" />
+            </div>
+            <div>
+              <div style={{ fontSize: 12, color: '#9CA3AF', marginBottom: 2 }}>{t(CONTACT.email)}</div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: '#111827', direction: 'ltr', textAlign: isAr ? 'right' : 'left' }}>noreply@scopsa.com</div>
+            </div>
           </a>
         </div>
       </section>

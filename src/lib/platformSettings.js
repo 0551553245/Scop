@@ -26,9 +26,9 @@ export function invalidateSettingsCache() {
 
 export const DEFAULT_SETTINGS = {
   trial_duration_days:  '14',
-  price_starter:        '199',
-  price_growth:         '499',
-  price_pro:            '999',
+  price_starter:        '99',
+  price_growth:         '199',
+  price_pro:            '399',
   support_whatsapp:     null,
   starter_branches:     '1',
   starter_managers:     '1',
