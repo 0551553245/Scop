@@ -5,6 +5,7 @@ import { getCached, setCached } from '../../lib/cache'
 import { useLanguage } from '../../context/LanguageContext'
 import { useIsMobile } from '../../hooks/useIsMobile'
 import BMLayout from '../../components/BMLayout'
+import ErrorBanner from '../../components/ErrorBanner'
 
 const DAYS_EN = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']
 const DAYS_AR = ['إث','ثل','أر','خم','جم','سب','أح']
@@ -246,9 +247,8 @@ export default function BMSchedule() {
       subtitle={weekLabel} branchName={branchName}>
 
       {error && (
-        <div style={{ margin:'16px 16px 0', background:'#FFF1F2', border:'0.5px solid #FECDD3', borderRadius:10, padding:'10px 14px', color:'#9F1239', fontSize:12, display:'flex', alignItems:'center', justifyContent:'space-between', gap:10 }}>
-          <span>{error}</span>
-          <button onClick={fetchEvents} style={{ background:'none', border:'1px solid #FECDD3', borderRadius:8, padding:'3px 8px', color:'#9F1239', fontSize:11, cursor:'pointer', flexShrink:0 }}>{isAr?'إعادة':'Retry'}</button>
+        <div style={{ margin:'16px 16px 0' }}>
+          <ErrorBanner message={error} isAr={isAr} onRetry={fetchEvents} />
         </div>
       )}
 

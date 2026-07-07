@@ -5,6 +5,7 @@ import { getCached, setCached, invalidateCache, debounce } from '../../lib/cache
 import { useLanguage } from '../../context/LanguageContext'
 import { uploadPhoto } from '../../lib/upload'
 import BMLayout from '../../components/BMLayout'
+import ErrorBanner from '../../components/ErrorBanner'
 import { CATEGORY_ORDER, CATEGORY_LABELS, formatTime } from '../../lib/taskConstants'
 
 export default function BMDailyTasks() {
@@ -178,12 +179,7 @@ export default function BMDailyTasks() {
       branchName={branchName}>
       <div style={{ padding:'16px 20px' }}>
 
-          {error && (
-            <div style={{ background:'#FFF1F2', border:'0.5px solid #FECDD3', borderRadius:10, padding:'10px 14px', color:'#9F1239', fontSize:12, display:'flex', alignItems:'center', justifyContent:'space-between', gap:10, marginBottom:10 }}>
-              <span>{error}</span>
-              <button onClick={fetchTasks} style={{ background:'none', border:'1px solid #FECDD3', borderRadius:8, padding:'3px 8px', color:'#9F1239', fontSize:11, cursor:'pointer', flexShrink:0 }}>{isAr?'إعادة':'Retry'}</button>
-            </div>
-          )}
+          <ErrorBanner message={error} isAr={isAr} onRetry={fetchTasks} />
 
           {ownerHasAccess === false && (
             <div style={{ background:'#FFF1F2', border:'0.5px solid #FECDD3', borderRadius:10, padding:'10px 14px', color:'#9F1239', fontSize:12, fontWeight:500, marginBottom:10 }}>

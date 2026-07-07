@@ -4,6 +4,7 @@ import { useBranchManagerAuth } from '../../context/BranchManagerAuthContext'
 import { getCached, setCached, invalidateCache, debounce } from '../../lib/cache'
 import { useLanguage } from '../../context/LanguageContext'
 import BMLayout from '../../components/BMLayout'
+import ErrorBanner from '../../components/ErrorBanner'
 
 function formatTime(iso) {
   return new Date(iso).toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit', hour12:true })
@@ -211,7 +212,7 @@ export default function BMFoodSafety() {
       branchName={branchName}>
       <div style={{ padding:'16px 20px', display:'flex', flexDirection:'column', gap:10 }}>
 
-          {error && <div style={{ background:'#FFF1F2', border:'0.5px solid #FECDD3', borderRadius:10, padding:'10px 14px', color:'#9F1239', fontSize:12 }}>{error}</div>}
+          <ErrorBanner message={error} isAr={isAr} />
 
           {ownerHasAccess === false && (
             <div style={{ background:'#FFF1F2', border:'0.5px solid #FECDD3', borderRadius:10, padding:'10px 14px', color:'#9F1239', fontSize:12, fontWeight:500 }}>

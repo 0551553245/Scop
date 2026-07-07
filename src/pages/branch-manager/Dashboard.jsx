@@ -8,6 +8,7 @@ import { getCached, setCached, invalidateCache, debounce } from '../../lib/cache
 import { calcRate } from '../../lib/stats'
 import { getWeekStartStr } from '../../lib/weekUtils'
 import BMLayout from '../../components/BMLayout'
+import ErrorBanner from '../../components/ErrorBanner'
 
 export default function BranchManagerDashboard() {
   const navigate = useNavigate()
@@ -160,12 +161,7 @@ export default function BranchManagerDashboard() {
     <BMLayout activePath="/branch-manager/dashboard" title="Dashboard" titleAr="لوحة التحكم" branchName={branchName}>
       <div style={{ padding:20, display:'flex', flexDirection:'column', gap:14 }}>
 
-        {error && (
-          <div style={{ background:'#FFF1F2', border:'0.5px solid #FECDD3', borderRadius:10, padding:'10px 14px', color:'#9F1239', fontSize:12, display:'flex', alignItems:'center', justifyContent:'space-between', gap:10 }}>
-            <span>{error}</span>
-            <button onClick={fetchDashboard} style={{ background:'none', border:'1px solid #FECDD3', borderRadius:8, padding:'3px 8px', color:'#9F1239', fontSize:11, cursor:'pointer', flexShrink:0 }}>{isAr?'إعادة':'Retry'}</button>
-          </div>
-        )}
+        <ErrorBanner message={error} isAr={isAr} onRetry={fetchDashboard} />
 
         {!ownerHasAccess && (
           <div style={{ background:'#FFF1F2', border:'0.5px solid #FECDD3', borderRadius:10, padding:'10px 14px', color:'#9F1239', fontSize:12, fontWeight:500 }}>
