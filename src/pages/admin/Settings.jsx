@@ -4,6 +4,7 @@ import { supabaseAdmin } from '../../lib/supabase'
 import { useAdminAuth } from '../../context/AdminAuthContext'
 import { useLanguage } from '../../context/LanguageContext'
 import { invalidateSettingsCache } from '../../lib/platformSettings'
+import { getCached, setCached, invalidateCache } from '../../lib/cache'
 import AdminLayout from '../../components/AdminLayout'
 import ErrorBanner from '../../components/ErrorBanner'
 
@@ -53,6 +54,24 @@ export default function AdminSettings() {
 
   const fetchSettings = useCallback(async () => {
     setError('')
+
+    const cacheKey = `admin-settings-${profile.id}`
+    const cached   = getCached(cacheKey)
+    if (cached) {
+      setPriceStarter(cached.priceStarter)
+      setPriceGrowth(cached.priceGrowth)
+      setPricePro(cached.pricePro)
+      setTrialDuration(cached.trialDuration)
+      setSupportWhatsapp(cached.supportWhatsapp)
+      setStarterBranches(cached.starterBranches)
+      setStarterManagers(cached.starterManagers)
+      setGrowthBranches(cached.growthBranches)
+      setGrowthManagers(cached.growthManagers)
+      setProBranches(cached.proBranches)
+      setProManagers(cached.proManagers)
+      setLoading(false)
+    }
+
     try {
       const { data, error: err } = await supabaseAdmin
         .from('platform_settings')
@@ -62,17 +81,32 @@ export default function AdminSettings() {
 
       const settings = Object.fromEntries((data || []).map(s => [s.key, s.value]))
 
-      if (settings.price_starter      !== undefined) setPriceStarter(Number(settings.price_starter))
-      if (settings.price_growth       !== undefined) setPriceGrowth(Number(settings.price_growth))
-      if (settings.price_pro          !== undefined) setPricePro(Number(settings.price_pro))
-      if (settings.trial_duration_days !== undefined) setTrialDuration(Number(settings.trial_duration_days))
-      if (settings.support_whatsapp   !== undefined) setSupportWhatsapp(settings.support_whatsapp)
-      if (settings.starter_branches   !== undefined) setStarterBranches(Number(settings.starter_branches))
-      if (settings.starter_managers   !== undefined) setStarterManagers(Number(settings.starter_managers))
-      if (settings.growth_branches    !== undefined) setGrowthBranches(Number(settings.growth_branches))
-      if (settings.growth_managers    !== undefined) setGrowthManagers(Number(settings.growth_managers))
-      if (settings.pro_branches       !== undefined) setProBranches(Number(settings.pro_branches))
-      if (settings.pro_managers       !== undefined) setProManagers(Number(settings.pro_managers))
+      const resolved = {
+        priceStarter:    settings.price_starter       !== undefined ? Number(settings.price_starter)       : priceStarter,
+        priceGrowth:     settings.price_growth        !== undefined ? Number(settings.price_growth)        : priceGrowth,
+        pricePro:        settings.price_pro           !== undefined ? Number(settings.price_pro)           : pricePro,
+        trialDuration:   settings.trial_duration_days !== undefined ? Number(settings.trial_duration_days) : trialDuration,
+        supportWhatsapp: settings.support_whatsapp    !== undefined ? settings.support_whatsapp             : supportWhatsapp,
+        starterBranches: settings.starter_branches    !== undefined ? Number(settings.starter_branches)    : starterBranches,
+        starterManagers: settings.starter_managers    !== undefined ? Number(settings.starter_managers)    : starterManagers,
+        growthBranches:  settings.growth_branches     !== undefined ? Number(settings.growth_branches)     : growthBranches,
+        growthManagers:  settings.growth_managers     !== undefined ? Number(settings.growth_managers)     : growthManagers,
+        proBranches:     settings.pro_branches        !== undefined ? Number(settings.pro_branches)        : proBranches,
+        proManagers:     settings.pro_managers        !== undefined ? Number(settings.pro_managers)        : proManagers,
+      }
+
+      setPriceStarter(resolved.priceStarter)
+      setPriceGrowth(resolved.priceGrowth)
+      setPricePro(resolved.pricePro)
+      setTrialDuration(resolved.trialDuration)
+      setSupportWhatsapp(resolved.supportWhatsapp)
+      setStarterBranches(resolved.starterBranches)
+      setStarterManagers(resolved.starterManagers)
+      setGrowthBranches(resolved.growthBranches)
+      setGrowthManagers(resolved.growthManagers)
+      setProBranches(resolved.proBranches)
+      setProManagers(resolved.proManagers)
+      setCached(cacheKey, resolved, 60000)
 
     } catch (err) {
       console.error('Settings fetch error:', err)
@@ -80,7 +114,7 @@ export default function AdminSettings() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [profile?.id])
 
   useEffect(() => { fetchSettings() }, [fetchSettings])
 
@@ -115,6 +149,7 @@ export default function AdminSettings() {
       if (err) throw err
 
       invalidateSettingsCache()
+      invalidateCache(`admin-settings-${profile.id}`)
       await logAction('settings_updated', 'Platform settings updated', null, 'platform_settings')
 
       setSaveMsg(isAr ? 'تم حفظ الإعدادات بنجاح' : 'Settings saved successfully.')

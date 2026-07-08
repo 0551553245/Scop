@@ -4,6 +4,7 @@ import { supabaseAdmin } from '../../lib/supabase'
 import { useAdminAuth } from '../../context/AdminAuthContext'
 import { useLanguage } from '../../context/LanguageContext'
 import { useIsMobile } from '../../hooks/useIsMobile'
+import { getCached, setCached, invalidateCache } from '../../lib/cache'
 import AdminLayout from '../../components/AdminLayout'
 import ErrorBanner from '../../components/ErrorBanner'
 import { formatDateTime } from '../../lib/adminHelpers'
@@ -59,6 +60,14 @@ export default function AdminNotifications() {
 
   const fetchHistory = useCallback(async () => {
     setError('')
+
+    const cacheKey = `admin-notifications-${profile.id}`
+    const cached   = getCached(cacheKey)
+    if (cached) {
+      setHistory(cached.history)
+      setLoading(false)
+    }
+
     try {
       const { data, error: err } = await supabaseAdmin
         .from('notifications')
@@ -67,7 +76,9 @@ export default function AdminNotifications() {
         .limit(20)
 
       if (err) throw err
-      setHistory(data || [])
+      const historyList = data || []
+      setHistory(historyList)
+      setCached(cacheKey, { history: historyList }, 60000)
 
     } catch (err) {
       console.error('Notifications fetch error:', err)
@@ -75,7 +86,7 @@ export default function AdminNotifications() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [profile?.id])
 
   useEffect(() => { fetchHistory() }, [fetchHistory])
 
@@ -83,7 +94,7 @@ export default function AdminNotifications() {
     if (!profile) return
     const channel = supabaseAdmin
       .channel(`admin-notifications-${profile.id}`)
-      .on('postgres_changes', { event:'*', schema:'public', table:'notifications' }, () => { fetchHistory() })
+      .on('postgres_changes', { event:'*', schema:'public', table:'notifications' }, () => { invalidateCache(`admin-notifications-${profile.id}`); fetchHistory() })
       .subscribe()
     return () => supabaseAdmin.removeChannel(channel)
   }, [profile, fetchHistory])
@@ -118,6 +129,7 @@ export default function AdminNotifications() {
 
       await logAction('notification_sent', `Sent notification "${titleEn.trim()}" to ${target}`, null, 'notification', { target })
 
+      invalidateCache(`admin-notifications-${profile.id}`)
       setSendSuccess(isAr ? 'تم إرسال الإشعار بنجاح' : 'Notification sent successfully.')
       setTitleEn(''); setTitleAr(''); setMessageEn(''); setMessageAr(''); setTarget('all')
       await fetchHistory()

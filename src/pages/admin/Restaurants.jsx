@@ -5,6 +5,7 @@ import { useAdminAuth } from '../../context/AdminAuthContext'
 import { useLanguage } from '../../context/LanguageContext'
 import { useIsMobile } from '../../hooks/useIsMobile'
 import { getPlatformSettings, getPlanLimits } from '../../lib/platformSettings'
+import { getCached, setCached, invalidateCache } from '../../lib/cache'
 import AdminLayout from '../../components/AdminLayout'
 import ErrorBanner from '../../components/ErrorBanner'
 import { formatDate, daysLeft, calculateExpiry } from '../../lib/adminHelpers'
@@ -116,6 +117,16 @@ export default function AdminRestaurants() {
   // ── FETCH OWNERS ──────────────────────────────────────────
   const fetchOwners = useCallback(async () => {
     setError('')
+
+    const cacheKey = `admin-restaurants-${profile.id}`
+    const cached   = getCached(cacheKey)
+    if (cached) {
+      setOwners(cached.owners)
+      setTotalCount(cached.totalCount)
+      setPlanLimits(cached.planLimits)
+      setLoading(false)
+    }
+
     try {
       const settings = await getPlatformSettings(supabaseAdmin)
       const limits = getPlanLimits(settings)
@@ -172,13 +183,14 @@ export default function AdminRestaurants() {
       })
 
       setOwners(combined)
+      setCached(cacheKey, { owners: combined, totalCount: count || 0, planLimits: limits }, 60000)
     } catch (err) {
       console.error('Restaurants fetch error:', err)
       setError('Failed to load restaurants.')
     } finally {
       setLoading(false)
     }
-  }, [page])
+  }, [page, profile?.id])
 
   // ── FETCH MANAGERS ────────────────────────────────────────
   const fetchManagers = useCallback(async () => {
@@ -215,9 +227,9 @@ export default function AdminRestaurants() {
     if (!profile) return
     const channel = supabaseAdmin
       .channel(`admin-restaurants-${profile.id}`)
-      .on('postgres_changes', { event:'*', schema:'public', table:'users' },         () => { fetchOwners(); fetchManagers() })
-      .on('postgres_changes', { event:'*', schema:'public', table:'subscriptions' },  () => { fetchOwners() })
-      .on('postgres_changes', { event:'*', schema:'public', table:'branches' },       () => { fetchOwners(); fetchManagers() })
+      .on('postgres_changes', { event:'*', schema:'public', table:'users' },         () => { invalidateCache(`admin-restaurants-${profile.id}`); fetchOwners(); fetchManagers() })
+      .on('postgres_changes', { event:'*', schema:'public', table:'subscriptions' },  () => { invalidateCache(`admin-restaurants-${profile.id}`); fetchOwners() })
+      .on('postgres_changes', { event:'*', schema:'public', table:'branches' },       () => { invalidateCache(`admin-restaurants-${profile.id}`); fetchOwners(); fetchManagers() })
       .subscribe()
     return () => supabaseAdmin.removeChannel(channel)
   }, [profile, fetchOwners, fetchManagers])
@@ -298,6 +310,7 @@ export default function AdminRestaurants() {
 
       await logAction('subscription_activated', `Activated ${actPlan} plan for ${drawerOwner.name}`, drawerOwner.id, 'subscription', { plan: actPlan, amount: Number(actAmount) })
 
+      invalidateCache(`admin-restaurants-${profile.id}`)
       closeDrawer()
       await fetchOwners()
     } catch (err) {
@@ -324,6 +337,7 @@ export default function AdminRestaurants() {
       if (err) throw err
 
       await logAction('trial_extended', `Extended trial by 7 days for ${drawerOwner.name}`, drawerOwner.id, 'subscription')
+      invalidateCache(`admin-restaurants-${profile.id}`)
       setDrawerMsg(isAr ? 'تم تمديد التجربة 7 أيام' : 'Trial extended by 7 days.')
       await fetchOwners()
     } catch (err) {
@@ -372,6 +386,7 @@ export default function AdminRestaurants() {
       if (subRes.error) throw subRes.error
       if (userRes.error) throw userRes.error
 
+      invalidateCache(`admin-restaurants-${profile.id}`)
       await logAction(isBlocked ? 'owner_unblocked' : 'owner_blocked', `${isBlocked ? 'Unblocked' : 'Blocked'} ${owner.name}`, owner.id, 'user')
     } catch (err) {
       console.error('Block/unblock error:', err)
@@ -447,6 +462,7 @@ export default function AdminRestaurants() {
           ? `تم إنشاء حساب ${cName} بنجاح — البريد: ${cEmail}`
           : `${cName}'s account created — email: ${cEmail}`)
         setCName(''); setCNameAr(''); setCEmail(''); setCPhone(''); setCPassword('')
+        invalidateCache(`admin-restaurants-${profile.id}`)
         await fetchOwners()
       } catch (innerErr) {
         console.error('Owner creation partial failure:', ownerId, innerErr)

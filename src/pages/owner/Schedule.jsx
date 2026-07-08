@@ -3,6 +3,7 @@ import { useIsMobile } from '../../hooks/useIsMobile'
 import { supabaseOwner } from '../../lib/supabase'
 import { useOwnerAuth } from '../../context/OwnerAuthContext'
 import { useSubscription } from '../../hooks/useSubscription'
+import { getCached, setCached, invalidateCache } from '../../lib/cache'
 import { useLanguage } from '../../context/LanguageContext'
 import SubscriptionGuard from '../../components/SubscriptionGuard'
 import NotificationBell from '../../components/NotificationBell'
@@ -102,6 +103,17 @@ export default function OwnerSchedule() {
   const fetchData = useCallback(async () => {
     if (!profile) return
     setError('')
+
+    const wk        = getWeekDates(anchor)
+    const weekStart = toDateStr(wk[0])
+    const cacheKey  = `owner-schedule-${profile.id}-${weekStart}`
+    const cached    = getCached(cacheKey)
+    if (cached) {
+      setBranches(cached.branches)
+      setEvents(cached.events)
+      setLoading(false)
+    }
+
     try {
       const { data: bData, error: bErr } = await supabaseOwner
         .from('branches')
@@ -109,9 +121,9 @@ export default function OwnerSchedule() {
         .eq('owner_id', profile.id)
         .eq('is_active', true)
       if (bErr) throw bErr
-      setBranches(bData || [])
+      const branchList = bData || []
+      setBranches(branchList)
 
-      const wk = getWeekDates(anchor)
       const { data: eData, error: eErr } = await supabaseOwner
         .from('schedule_events')
         .select('id, title, title_ar, description, event_date, start_time, end_time, category, branch_id, created_by, is_private')
@@ -120,7 +132,9 @@ export default function OwnerSchedule() {
         .lte('event_date', toDateStr(wk[6]))
         .order('start_time', { ascending: true })
       if (eErr) throw eErr
-      setEvents(eData || [])
+      const eventList = eData || []
+      setEvents(eventList)
+      setCached(cacheKey, { branches: branchList, events: eventList }, 30000)
     } catch (err) {
       console.error('Schedule fetch error:', err)
       setError(isAr ? 'فشل تحميل الجدول' : 'Failed to load schedule.')
@@ -135,7 +149,11 @@ export default function OwnerSchedule() {
     if (!profile) return
     const ch = supabaseOwner
       .channel(`owner-schedule-${profile.id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'schedule_events' }, () => fetchData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'schedule_events' }, () => {
+        const wk = getWeekDates(anchor)
+        invalidateCache(`owner-schedule-${profile.id}-${toDateStr(wk[0])}`)
+        fetchData()
+      })
       .subscribe()
     return () => supabaseOwner.removeChannel(ch)
   }, [profile?.id, fetchData])
@@ -169,6 +187,8 @@ export default function OwnerSchedule() {
           created_by:  profile.id,
         })
       if (insErr) throw insErr
+      const evWeekStart = toDateStr(getWeekDates(new Date(form.event_date))[0])
+      invalidateCache(`owner-schedule-${profile.id}-${evWeekStart}`)
       setForm(f => ({ ...f, title: '', title_ar: '', description: '' }))
       await fetchData()
     } catch (err) {
@@ -189,6 +209,8 @@ export default function OwnerSchedule() {
         .eq('id', ev.id)
         .eq('created_by', profile.id)
       if (delErr) throw delErr
+      const evWeekStart = toDateStr(getWeekDates(new Date(ev.event_date))[0])
+      invalidateCache(`owner-schedule-${profile.id}-${evWeekStart}`)
     } catch (err) {
       console.error('Delete event error:', err)
       setError(isAr ? 'فشل حذف الحدث' : 'Failed to delete event.')

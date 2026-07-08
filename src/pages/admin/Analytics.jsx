@@ -4,6 +4,7 @@ import { supabaseAdmin } from '../../lib/supabase'
 import { useAdminAuth } from '../../context/AdminAuthContext'
 import { useLanguage } from '../../context/LanguageContext'
 import { calcRate } from '../../lib/stats'
+import { getCached, setCached, invalidateCache } from '../../lib/cache'
 import AdminLayout from '../../components/AdminLayout'
 import ErrorBanner from '../../components/ErrorBanner'
 
@@ -27,6 +28,20 @@ export default function AdminAnalytics() {
 
   const fetchAnalytics = useCallback(async () => {
     setError('')
+
+    const cacheKey = `admin-analytics-${profile.id}`
+    const cached   = getCached(cacheKey)
+    if (cached) {
+      setTasksToday(cached.tasksToday)
+      setFsToday(cached.fsToday)
+      setAvgCompletion(cached.avgCompletion)
+      setDailyChart(cached.dailyChart)
+      setAdoption(cached.adoption)
+      setAtRisk(cached.atRisk)
+      setTopCities(cached.topCities)
+      setLoading(false)
+    }
+
     try {
       const now        = new Date()
       const today       = dayKey(now)
@@ -49,11 +64,14 @@ export default function AdminAnalytics() {
       const fsSubs     = fsSubsRes.data || []
       const scheduleRows = scheduleRes.data || []
 
-      setTasksToday(taskSubs.filter(s => dayKey(s.submitted_at) === today).length)
-      setFsToday(fsSubs.filter(s => dayKey(s.submitted_at) === today).length)
+      const tasksTodayCount = taskSubs.filter(s => dayKey(s.submitted_at) === today).length
+      const fsTodayCount    = fsSubs.filter(s => dayKey(s.submitted_at) === today).length
+      setTasksToday(tasksTodayCount)
+      setFsToday(fsTodayCount)
 
-      const completedCount = taskSubs.filter(s => s.status === 'completed').length
-      setAvgCompletion(calcRate(completedCount, taskSubs.length))
+      const completedCount   = taskSubs.filter(s => s.status === 'completed').length
+      const avgCompletionPct = calcRate(completedCount, taskSubs.length)
+      setAvgCompletion(avgCompletionPct)
 
       // Daily completion bar chart, last 14 days
       const days = []
@@ -73,11 +91,12 @@ export default function AdminAnalytics() {
       const branchesWithFS       = new Set(fsSubs.map(s => s.branch_id)).size
       const branchesWithSchedule = new Set(scheduleRows.map(r => r.branch_id)).size
 
-      setAdoption({
+      const adoptionObj = {
         tasks:      Math.round((branchesWithTasks    / totalBranches) * 100),
         foodSafety: Math.round((branchesWithFS       / totalBranches) * 100),
         schedule:   Math.round((branchesWithSchedule / totalBranches) * 100),
-      })
+      }
+      setAdoption(adoptionObj)
 
       // At-risk: zero task AND food-safety activity in last 7 days
       const activeBranchIds7d = new Set([
@@ -93,7 +112,8 @@ export default function AdminAnalytics() {
         if (ownersRes.error) throw ownersRes.error
         ;(ownersRes.data || []).forEach(o => { ownersById[o.id] = o })
       }
-      setAtRisk(riskyBranches.map(b => ({ ...b, owner: ownersById[b.owner_id] })))
+      const atRiskList = riskyBranches.map(b => ({ ...b, owner: ownersById[b.owner_id] }))
+      setAtRisk(atRiskList)
 
       // Most active cities — skip branches with no city set
       const cityCounts = {}
@@ -106,13 +126,18 @@ export default function AdminAnalytics() {
       const sortedCities = Object.entries(cityCounts).sort((a, b) => b[1] - a[1]).slice(0, 6)
       setTopCities(sortedCities)
 
+      setCached(cacheKey, {
+        tasksToday: tasksTodayCount, fsToday: fsTodayCount, avgCompletion: avgCompletionPct,
+        dailyChart: chart, adoption: adoptionObj, atRisk: atRiskList, topCities: sortedCities,
+      }, 60000)
+
     } catch (err) {
       console.error('Analytics fetch error:', err)
       setError(isAr ? 'فشل تحميل التحليلات' : 'Failed to load analytics.')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [profile?.id])
 
   useEffect(() => { fetchAnalytics() }, [fetchAnalytics])
 
@@ -120,8 +145,8 @@ export default function AdminAnalytics() {
     if (!profile) return
     const channel = supabaseAdmin
       .channel(`admin-analytics-${profile.id}`)
-      .on('postgres_changes', { event:'*', schema:'public', table:'task_submissions' },        () => { fetchAnalytics() })
-      .on('postgres_changes', { event:'*', schema:'public', table:'food_safety_submissions' },  () => { fetchAnalytics() })
+      .on('postgres_changes', { event:'*', schema:'public', table:'task_submissions' },        () => { invalidateCache(`admin-analytics-${profile.id}`); fetchAnalytics() })
+      .on('postgres_changes', { event:'*', schema:'public', table:'food_safety_submissions' },  () => { invalidateCache(`admin-analytics-${profile.id}`); fetchAnalytics() })
       .subscribe()
     return () => supabaseAdmin.removeChannel(channel)
   }, [profile, fetchAnalytics])

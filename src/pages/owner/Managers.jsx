@@ -5,6 +5,7 @@ import { supabaseOwner } from '../../lib/supabase'
 import { useOwnerAuth } from '../../context/OwnerAuthContext'
 import { getExpectedForBranch, calcRate } from '../../lib/stats'
 import { useSubscription } from '../../hooks/useSubscription'
+import { getCached, setCached, invalidateCache } from '../../lib/cache'
 import SubscriptionGuard from '../../components/SubscriptionGuard'
 import NotificationBell from '../../components/NotificationBell'
 import { useLanguage } from '../../context/LanguageContext'
@@ -61,6 +62,15 @@ export default function OwnerManagers() {
     if (!profile) return
     setError('')
 
+    const cacheKey = `owner-managers-${profile.id}`
+    const cached   = getCached(cacheKey)
+    if (cached) {
+      setBranches(cached.branches)
+      setManagers(cached.managers)
+      setPerfMap(cached.perfMap)
+      setLoading(false)
+    }
+
     try {
       const today = new Date().toISOString().split('T')[0]
 
@@ -80,6 +90,8 @@ export default function OwnerManagers() {
 
       if (managerIds.length === 0) {
         setManagers([])
+        setPerfMap({})
+        setCached(cacheKey, { branches: allBranches, managers: [], perfMap: {} }, 30000)
         setLoading(false)
         return
       }
@@ -139,6 +151,7 @@ export default function OwnerManagers() {
         branch: allBranches.find(b => b.manager_id === mgr.id) || null,
       }))
       setManagers(enriched)
+      setCached(cacheKey, { branches: allBranches, managers: enriched, perfMap: perf }, 30000)
 
     } catch (err) {
       console.error('Managers fetch error:', err)
@@ -154,9 +167,9 @@ export default function OwnerManagers() {
   useEffect(() => {
     if (!profile) return
     const ch = supabaseOwner.channel(`managers-${profile.id}`)
-      .on('postgres_changes', { event:'*', schema:'public', table:'branches' }, () => { fetchData() })
-      .on('postgres_changes', { event:'*', schema:'public', table:'task_submissions' }, () => { fetchData() })
-      .on('postgres_changes', { event:'*', schema:'public', table:'users' }, () => { fetchData() })
+      .on('postgres_changes', { event:'*', schema:'public', table:'branches' }, () => { invalidateCache(`owner-managers-${profile.id}`); fetchData() })
+      .on('postgres_changes', { event:'*', schema:'public', table:'task_submissions' }, () => { invalidateCache(`owner-managers-${profile.id}`); fetchData() })
+      .on('postgres_changes', { event:'*', schema:'public', table:'users' }, () => { invalidateCache(`owner-managers-${profile.id}`); fetchData() })
       .subscribe()
     return () => supabaseOwner.removeChannel(ch)
   }, [profile?.id, fetchData])
@@ -219,6 +232,7 @@ export default function OwnerManagers() {
       setMName(''); setMNameAr(''); setMEmail('')
       setMPhone(''); setMPassword(''); setMBranchId('')
       setModalSuccess(isAr ? 'تم إضافة المدير بنجاح' : 'Manager added successfully')
+      invalidateCache(`owner-managers-${profile.id}`)
       await fetchData()
 
     } catch (err) {

@@ -4,7 +4,7 @@ import { supabaseOwner } from '../../lib/supabase'
 import { useOwnerAuth } from '../../context/OwnerAuthContext'
 import { useLanguage } from '../../context/LanguageContext'
 import { useSubscription } from '../../hooks/useSubscription'
-import { invalidateCache } from '../../lib/cache'
+import { getCached, setCached, invalidateCache } from '../../lib/cache'
 import SubscriptionGuard from '../../components/SubscriptionGuard'
 import OwnerLayout from '../../components/OwnerLayout'
 import ErrorBanner from '../../components/ErrorBanner'
@@ -64,23 +64,34 @@ export default function OwnerFoodSafety() {
   const fetchData = useCallback(async () => {
     if (!profile) return
     setError('')
-    try {
-      const today = new Date().toISOString().split('T')[0]
 
+    const today    = new Date().toISOString().split('T')[0]
+    const cacheKey = `owner-food-safety-${profile.id}-${today}`
+    const cached   = getCached(cacheKey)
+    if (cached) {
+      setBranches(cached.branches)
+      setStandards(cached.standards)
+      setFsSubmissions(cached.fsSubmissions)
+      setLoading(false)
+    }
+
+    try {
       const [bRes, stdsRes] = await Promise.all([
         supabaseOwner.from('branches').select('id, name, name_ar').eq('owner_id', profile.id).eq('is_active', true),
         supabaseOwner.from('food_safety_standards').select('id, name, name_ar, min_temp, max_temp, standard_type, unit, branch_id, is_active, created_at').eq('created_by', profile.id).eq('is_active', true).order('created_at', { ascending: false }),
       ])
       if (stdsRes.error) throw stdsRes.error
-
       if (bRes.error) throw bRes.error
-      const branchList = bRes.data || []
-      setBranches(branchList)
-      setStandards(stdsRes.data || [])
 
+      const branchList    = bRes.data || []
+      const standardsList = stdsRes.data || []
+      setBranches(branchList)
+      setStandards(standardsList)
+
+      let fsSubData = []
       const bIds = branchList.map(b => b.id)
       if (bIds.length > 0) {
-        const { data: fsSubData, error: fsSubErr } = await supabaseOwner
+        const { data, error: fsSubErr } = await supabaseOwner
           .from('food_safety_submissions')
           .select('id, standard_id, branch_id, result, actual_value, corrective_note, submitted_at, submitted_by, users(name, name_ar)')
           .in('branch_id', bIds)
@@ -88,8 +99,10 @@ export default function OwnerFoodSafety() {
           .lte('submitted_at', today + 'T23:59:59.999Z')
           .limit(2000)
         if (fsSubErr) console.error('Food safety submissions fetch error:', fsSubErr)
-        setFsSubmissions(fsSubData || [])
+        fsSubData = data || []
       }
+      setFsSubmissions(fsSubData)
+      setCached(cacheKey, { branches: branchList, standards: standardsList, fsSubmissions: fsSubData }, 30000)
     } catch (err) {
       console.error('FoodSafety fetch error:', err)
       setError('Failed to load standards.')
@@ -105,7 +118,10 @@ export default function OwnerFoodSafety() {
     const ch = supabaseOwner
       .channel(`owner-food-safety-${profile.id}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'food_safety_submissions' },
-        () => { invalidateCache(`owner-food-safety-${profile.id}`); fetchData() })
+        () => {
+          invalidateCache(`owner-food-safety-${profile.id}-${new Date().toISOString().split('T')[0]}`)
+          fetchData()
+        })
       .subscribe()
     return () => supabaseOwner.removeChannel(ch)
   }, [profile?.id, fetchData])
@@ -161,6 +177,7 @@ export default function OwnerFoodSafety() {
 
       if (insErr) throw insErr
 
+      invalidateCache(`owner-food-safety-${profile.id}-${new Date().toISOString().split('T')[0]}`)
       setSaveOk(isAr ? '✓ تم حفظ المعيار بنجاح' : '✓ Standard saved successfully.')
       setTplIdx(null)
       setStdName('')
@@ -187,6 +204,7 @@ export default function OwnerFoodSafety() {
         .eq('id', id)
         .eq('created_by', profile.id)
       if (error) throw error
+      invalidateCache(`owner-food-safety-${profile.id}-${new Date().toISOString().split('T')[0]}`)
       setStandards(prev => prev.filter(s => s.id !== id))
     } catch (err) {
       console.error('Delete failed:', err)

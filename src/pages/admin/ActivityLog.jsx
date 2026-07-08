@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabaseAdmin } from '../../lib/supabase'
 import { useAdminAuth } from '../../context/AdminAuthContext'
 import { useLanguage } from '../../context/LanguageContext'
+import { getCached, setCached, invalidateCache } from '../../lib/cache'
 import AdminLayout from '../../components/AdminLayout'
 import ErrorBanner from '../../components/ErrorBanner'
 import { formatDateTime } from '../../lib/adminHelpers'
@@ -33,6 +34,14 @@ export default function AdminActivityLog() {
 
   const fetchLogs = useCallback(async () => {
     setError('')
+
+    const cacheKey = `admin-activity-log-${profile.id}`
+    const cached   = getCached(cacheKey)
+    if (cached) {
+      setLogs(cached.logs)
+      setLoading(false)
+    }
+
     try {
       let query = supabaseAdmin
         .from('activity_log')
@@ -46,7 +55,9 @@ export default function AdminActivityLog() {
 
       const { data, error: err } = await query
       if (err) throw err
-      setLogs(data || [])
+      const logList = data || []
+      setLogs(logList)
+      setCached(cacheKey, { logs: logList }, 60000)
 
     } catch (err) {
       console.error('Activity log fetch error:', err)
@@ -54,7 +65,7 @@ export default function AdminActivityLog() {
     } finally {
       setLoading(false)
     }
-  }, [filter])
+  }, [filter, profile?.id])
 
   useEffect(() => { fetchLogs() }, [fetchLogs])
 
@@ -62,7 +73,7 @@ export default function AdminActivityLog() {
     if (!profile) return
     const channel = supabaseAdmin
       .channel(`admin-activity-log-${profile.id}`)
-      .on('postgres_changes', { event:'*', schema:'public', table:'activity_log' }, () => { fetchLogs() })
+      .on('postgres_changes', { event:'*', schema:'public', table:'activity_log' }, () => { invalidateCache(`admin-activity-log-${profile.id}`); fetchLogs() })
       .subscribe()
     return () => supabaseAdmin.removeChannel(channel)
   }, [profile, fetchLogs])
