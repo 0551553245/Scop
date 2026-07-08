@@ -9,6 +9,13 @@ import AdminLayout from '../../components/AdminLayout'
 import ErrorBanner from '../../components/ErrorBanner'
 import { formatDate, daysLeft, calculateExpiry } from '../../lib/adminHelpers'
 
+function formatWhatsAppPhone(phone) {
+  let digits = phone.replace(/[\s\-+]/g, '')
+  digits = digits.replace(/^0+/, '')
+  if (!digits.startsWith('966')) digits = '966' + digits
+  return digits
+}
+
 const PLAN_BADGE = {
   starter: { bg:'#EFF6FF', color:'#1D4ED8' },
   growth:  { bg:'#F0FDF4', color:'#166534' },
@@ -671,12 +678,40 @@ export default function AdminRestaurants() {
                                         </span>
                                       )}
                                     </div>
-                                    <div style={{ color:'#9CA3AF', fontSize:11, marginTop:2 }}>{isAr ? o.name_ar || o.name : o.name} · {o.email}</div>
+                                    <div style={{ color:'#9CA3AF', fontSize:11, marginTop:2, display:'flex', alignItems:'center', gap:6 }}>
+                                      <span>{isAr ? o.name_ar || o.name : o.name} · {o.email}</span>
+                                      {o.phone && (
+                                        <a
+                                          href={`https://wa.me/${formatWhatsAppPhone(o.phone)}`}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          aria-label="Contact on WhatsApp"
+                                          onClick={e => e.stopPropagation()}
+                                          style={{ display:'inline-flex', alignItems:'center', justifyContent:'center', color:'#25D366', fontSize:14, flexShrink:0 }}
+                                        >
+                                          <i className="ti ti-brand-whatsapp" />
+                                        </a>
+                                      )}
+                                    </div>
                                   </>
                                 ) : (
                                   <>
                                     <div style={{ color:'#6B7280', fontSize:13, fontStyle:'italic' }}>{isAr ? '(لا يوجد فرع بعد)' : '(No branch yet)'}</div>
-                                    <div style={{ color:'#9CA3AF', fontSize:11, marginTop:2 }}>{isAr ? o.name_ar || o.name : o.name} · {o.email}</div>
+                                    <div style={{ color:'#9CA3AF', fontSize:11, marginTop:2, display:'flex', alignItems:'center', gap:6 }}>
+                                      <span>{isAr ? o.name_ar || o.name : o.name} · {o.email}</span>
+                                      {o.phone && (
+                                        <a
+                                          href={`https://wa.me/${formatWhatsAppPhone(o.phone)}`}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          aria-label="Contact on WhatsApp"
+                                          onClick={e => e.stopPropagation()}
+                                          style={{ display:'inline-flex', alignItems:'center', justifyContent:'center', color:'#25D366', fontSize:14, flexShrink:0 }}
+                                        >
+                                          <i className="ti ti-brand-whatsapp" />
+                                        </a>
+                                      )}
+                                    </div>
                                   </>
                                 )}
                               </td>

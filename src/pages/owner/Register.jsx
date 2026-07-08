@@ -171,6 +171,13 @@ export default function OwnerRegister() {
     setError('')
   }
 
+  function isValidSaudiPhone(phone) {
+    const compact = phone.trim().replace(/[\s-]/g, '')
+    const startsOk = compact.startsWith('05') || compact.startsWith('+9665')
+    const digitCount = compact.replace(/\D/g, '').length
+    return startsOk && digitCount >= 10
+  }
+
   const pwLen = form.password.length
   const pwStrength = pwLen === 0 ? null
     : pwLen < 8  ? { pct: 30,  color: '#E24B4A' }
@@ -181,7 +188,9 @@ export default function OwnerRegister() {
     if (!form.restaurantName.trim()) return setError(isAr ? 'اسم المطعم مطلوب' : 'Restaurant name is required')
     if (!form.city)                  return setError(isAr ? 'المدينة مطلوبة'    : 'City is required')
     if (!form.ownerName.trim())      return setError(isAr ? 'الاسم مطلوب'        : 'Name is required')
-    if (!form.phone.trim())          return setError(isAr ? 'الهاتف مطلوب'       : 'Phone is required')
+    if (!form.phone.trim())          return setError(isAr ? 'رقم الجوال مطلوب'   : 'Phone number is required')
+    if (!isValidSaudiPhone(form.phone))
+      return setError(isAr ? 'رقم جوال غير صحيح — يجب أن يبدأ بـ 05 أو 9665+' : 'Invalid phone number — must start with 05 or +9665')
     if (!form.email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email))
       return setError(isAr ? 'البريد الإلكتروني غير صحيح' : 'Invalid email address')
     if (form.password.length < 8)
@@ -500,7 +509,7 @@ export default function OwnerRegister() {
             </div>
             <div style={{ marginBottom: 10 }}>
               <label style={labelStyle}>
-                {isAr ? 'رقم الهاتف' : 'Phone'} <span style={{ color: '#E24B4A' }}>*</span>
+                {isAr ? 'رقم الجوال' : 'Phone number'} <span style={{ color: '#E24B4A' }}>*</span>
               </label>
               <input
                 type="tel" value={form.phone}
