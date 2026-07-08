@@ -5,6 +5,7 @@ import { OwnerAuthProvider, useOwnerAuth } from './context/OwnerAuthContext'
 import { BranchManagerAuthProvider, useBranchManagerAuth } from './context/BranchManagerAuthContext'
 import { AdminAuthProvider, useAdminAuth } from './context/AdminAuthContext'
 import ProtectedRoute from './components/ProtectedRoute'
+import ErrorBoundary from './components/ErrorBoundary'
 
 const Landing               = lazy(() => import('./pages/Landing'))
 const PrivacyPolicy         = lazy(() => import('./pages/PrivacyPolicy'))
@@ -78,6 +79,7 @@ export default function App() {
   return (
     <LanguageProvider>
       <BrowserRouter>
+        <ErrorBoundary>
         <Suspense fallback={<PageLoader />}>
         <Routes>
           <Route path="/" element={<Landing />} />
@@ -131,6 +133,7 @@ export default function App() {
           </Route>
         </Routes>
         </Suspense>
+        </ErrorBoundary>
       </BrowserRouter>
     </LanguageProvider>
   )
