@@ -1930,4 +1930,78 @@ SELECT cron.schedule(
 ```
 **Rule:** Any time-based enforcement must have a server-side scheduled job — never rely on frontend checks alone for business-critical limits. A frontend `isExpired` check only enforces itself in browsers that are open and running that exact code; it does nothing to the underlying data. `SECURITY DEFINER` functions used this way must pin `SET search_path = public` (see BUG #056) to avoid search-path hijacking.
 
-## Bug count: #038 – #159 (122 bugs total)
+---
+
+## BUG #160 — HIGH: Reports.jsx food safety pass rate used submission count not standards count
+
+**File:** src/pages/owner/Reports.jsx
+**Symptom:** Food safety pass rate on the owner Reports page was inflated whenever not every standard was submitted during the selected period — e.g. 5 active standards with only 1 submission (which passed) showed 100% instead of 20%.
+**Root cause:** Same class of bug as #069 (Branches.jsx) and #073 (Managers.jsx). `Reports.jsx` only ever fetched `food_safety_submissions` — it never fetched `food_safety_standards` at all — and computed `fsTotal = fsFiltered.length`, using the submission count as its own denominator instead of the count of standards that should have been checked.
+**WRONG:**
+```js
+const fsPassed  = fsFiltered.filter(s => s.result === 'pass').length
+const fsTotal   = fsFiltered.length   // submissions count, not standards count
+const fsRate    = calcRate(fsPassed, fsTotal)
+```
+**CORRECT:**
+```js
+// Fetched alongside the other Promise.all queries:
+supabaseOwner.from('food_safety_standards')
+  .select('id, branch_id')
+  .eq('created_by', profile.id)
+  .eq('is_active', true)
+
+// In the KPI calculation:
+const bStds     = fsStds.filter(s => branchIds.includes(s.branch_id) || s.branch_id === null)
+const fsPassed  = fsFiltered.filter(s => s.result === 'pass').length
+const fsTotal   = bStds.length   // active standards count
+const fsRate    = calcRate(fsPassed, fsTotal)
+```
+**Rule:** Food safety rate denominator = active STANDARDS count scoped to the owner's branches (branch-specific OR global via `branch_id === null`), never the submission count for the period. This is the third file to have this exact bug (#069 Branches.jsx, #073 Managers.jsx, #160 Reports.jsx) — any new page that displays a food safety pass rate must fetch `food_safety_standards` and use its count as the denominator from the start, not reimplement inline.
+
+---
+
+## BUG #161 — HIGH: Reports.jsx task completion rate denominator pegged to one day regardless of selected period
+
+**File:** src/pages/owner/Reports.jsx
+**Symptom:** Completion rate on the owner Reports page was inflated (silently clipped to 100% via `calcRate`'s cap) for any period longer than "Today" — "This Week", "This Month", and "Last 3 Months" all showed near-100% completion rate almost regardless of actual performance.
+**Root cause:** `kpi.expected` was computed as `getTotalExpected(branchIds, taskDefs)` — a single day's task total — while `kpi.done` (`filtered.filter(s => s.status === 'completed').length`) accumulates completions across the ENTIRE selected period (`filtered` spans all matching days). A month's worth of `done` compared against one day's worth of `expected` is guaranteed to exceed 100%, which `calcRate`'s `Math.min(100, ...)` then silently clips — masking the real rate instead of erroring.
+**WRONG:**
+```js
+const expected  = getTotalExpected(branchIds, taskDefs)   // always a single day's count
+const done      = filtered.filter(s => s.status === 'completed').length   // accumulated over the whole period
+const compRate  = calcRate(done, expected)   // done ≫ expected for any period > today → clipped to 100%
+```
+**CORRECT:**
+```js
+// numDays already existed in this file (getPeriodStart/period-derived):
+// today=1, week=days since last Saturday, month=days since month start, 3m=90
+const expected  = getTotalExpected(branchIds, taskDefs) * numDays
+const done      = filtered.filter(s => s.status === 'completed').length
+const compRate  = calcRate(done, expected)
+```
+**Rule:** Whenever `done`/`submitted` is accumulated across a multi-day period (not just "today"), the `expected` denominator computed from `getTotalExpected`/`getExpectedForBranch` (both single-day counts) MUST be multiplied by the number of days actually covered by that period. Never compare a period-accumulated numerator against a single-day denominator — `calcRate`'s 100% cap will silently hide the mismatch instead of surfacing it as an error.
+**Known related, not yet fixed:** `branchPerf` (same file, per-branch performance bars) has the identical pattern — `bExpected = getExpectedForBranch(b.id, taskDefs)` is single-day while `bDone` accumulates over the whole period. Flagged for a follow-up fix, not included here.
+
+---
+
+## BUG #162 — HIGH: Reports.jsx branchPerf denominator pegged to one day regardless of selected period
+
+**File:** src/pages/owner/Reports.jsx
+**Symptom:** Per-branch performance bars on the owner Reports page were inflated toward 100% for any period longer than "Today" — same visible symptom as #161, just on the per-branch breakdown instead of the top KPI.
+**Root cause:** Identical pattern to #161, in a second place in the same file: `bExpected = getExpectedForBranch(b.id, taskDefs)` is a single day's count, while `bDone` (`filtered.filter(s => s.branch_id === b.id && s.status === 'completed').length`) accumulates over the whole selected period.
+**WRONG:**
+```js
+const bExpected = getExpectedForBranch(b.id, taskDefs)   // single day's count
+const bDone     = filtered.filter(s => s.branch_id === b.id && s.status === 'completed').length
+const pct       = calcRate(bDone, bExpected)
+```
+**CORRECT:**
+```js
+const bExpected = getExpectedForBranch(b.id, taskDefs) * numDays
+const bDone     = filtered.filter(s => s.branch_id === b.id && s.status === 'completed').length
+const pct       = calcRate(bDone, bExpected)
+```
+**Rule:** Same rule as #161 — applies per-branch, not just to the page-level KPI. Any `useMemo`/calculation in this file that compares a period-accumulated `done`/`filtered` count against a `getExpectedForBranch`/`getTotalExpected` result must multiply that expected value by `numDays` first. Check every such pairing in a file before considering a period-based rate fix complete — this bug existed in two separate places here.
+
+## Bug count: #038 – #162 (125 bugs total)

@@ -93,6 +93,7 @@ export default function OwnerReports() {
   const [branches,  setBranches]  = useState([])
   const [taskSubs,  setTaskSubs]  = useState([])
   const [fsSubs,    setFsSubs]    = useState([])
+  const [fsStds,    setFsStds]    = useState([])   // active food safety standards owned by this owner
   const [taskDefs,  setTaskDefs]  = useState([])   // active tasks owned by this owner
   const [loading,   setLoading]   = useState(true)
   const [error,     setError]     = useState('')
@@ -116,6 +117,7 @@ export default function OwnerReports() {
       setBranches(cached.branches)
       setTaskSubs(cached.taskSubs)
       setFsSubs(cached.fsSubs)
+      setFsStds(cached.fsStds)
       setTaskDefs(cached.taskDefs)
       setLoading(false)
     }
@@ -145,8 +147,8 @@ export default function OwnerReports() {
         .gte('submitted_at', `${start}T00:00:00.000Z`)
         .lte('submitted_at', `${end}T23:59:59.999Z`)
 
-      // All 4 queries run simultaneously — page 0 task_submissions joins the round
-      const [fsRes, tasksRes, globalTasksRes, p0Res] = await Promise.all([
+      // All 5 queries run simultaneously — page 0 task_submissions joins the round
+      const [fsRes, fsStdsRes, tasksRes, globalTasksRes, p0Res] = await Promise.all([
         supabaseOwner
           .from('food_safety_submissions')
           .select('id, result, branch_id, submitted_at, standard_id, food_safety_standards(id, name, name_ar)')
@@ -154,6 +156,11 @@ export default function OwnerReports() {
           .gte('submitted_at', `${start}T00:00:00.000Z`)
           .lte('submitted_at', `${end}T23:59:59.999Z`)
           .limit(5000),
+        supabaseOwner
+          .from('food_safety_standards')
+          .select('id, branch_id')
+          .eq('created_by', profile.id)
+          .eq('is_active', true),
         supabaseOwner
           .from('tasks')
           .select('id, branch_id, frequency')
@@ -168,6 +175,7 @@ export default function OwnerReports() {
         taskSubQuery().range(0, PAGE - 1),
       ])
       if (fsRes.error)          throw fsRes.error
+      if (fsStdsRes.error)      throw fsStdsRes.error
       if (tasksRes.error)       throw tasksRes.error
       if (globalTasksRes.error) throw globalTasksRes.error
       if (p0Res.error)          throw p0Res.error
@@ -191,11 +199,13 @@ export default function OwnerReports() {
 
       setTaskSubs(filteredSubs)
       setFsSubs(fsRes.data || [])
+      setFsStds(fsStdsRes.data || [])
       setTaskDefs(allTaskDefs)
       setCached(cacheKey, {
         branches: bList,
         taskSubs: filteredSubs,
         fsSubs:   fsRes.data || [],
+        fsStds:   fsStdsRes.data || [],
         taskDefs: allTaskDefs,
       }, 300000)
     } catch (err) {
@@ -241,16 +251,17 @@ export default function OwnerReports() {
   // ── KPI ───────────────────────────────────────────────────
   const kpi = useMemo(() => {
     const branchIds = branches.map(b => b.id)
-    const expected  = getTotalExpected(branchIds, taskDefs)
+    const expected  = getTotalExpected(branchIds, taskDefs) * numDays
     const submitted = filtered.length
     const done      = filtered.filter(s => s.status === 'completed').length
     const missed    = Math.max(0, expected - done)
     const compRate  = calcRate(done, expected)
+    const bStds     = fsStds.filter(s => branchIds.includes(s.branch_id) || s.branch_id === null)
     const fsPassed  = fsFiltered.filter(s => s.result === 'pass').length
-    const fsTotal   = fsFiltered.length
+    const fsTotal   = bStds.length
     const fsRate    = calcRate(fsPassed, fsTotal)
     return { submitted, done, expected, missed, compRate, fsRate, fsPassed, fsTotal }
-  }, [filtered, fsFiltered, branches, taskDefs])
+  }, [filtered, fsFiltered, fsStds, branches, taskDefs, numDays])
 
   // ── CHART DATA ────────────────────────────────────────────
   const chartData = useMemo(() => {
@@ -303,12 +314,12 @@ export default function OwnerReports() {
   // ── BRANCH PERFORMANCE ────────────────────────────────────
   const branchPerf = useMemo(() =>
     branches.map(b => {
-      const bExpected = getExpectedForBranch(b.id, taskDefs)
+      const bExpected = getExpectedForBranch(b.id, taskDefs) * numDays
       const bDone     = filtered.filter(s => s.branch_id === b.id && s.status === 'completed').length
       const pct       = calcRate(bDone, bExpected)
       return { ...b, expected: bExpected, done: bDone, pct }
     }).sort((a, b) => b.pct - a.pct),
-    [branches, filtered, taskDefs],
+    [branches, filtered, taskDefs, numDays],
   )
 
   // ── TOP MISSED TASKS ──────────────────────────────────────
