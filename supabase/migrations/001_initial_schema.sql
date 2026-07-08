@@ -1,0 +1,7 @@
+-- Initial schema created via Supabase dashboard
+-- Tables: users, branches, subscriptions, billing_history,
+--         tasks, task_submissions, food_safety_standards,
+--         food_safety_submissions, schedule_events, platform_settings,
+--         activity_log, notifications
+-- RLS enabled on all tables
+-- See Supabase dashboard for full schema details
