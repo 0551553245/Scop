@@ -1892,4 +1892,42 @@ Bucket flipped to `public: false`. New hook `useSignedUrl(path, client)` generat
 ```
 **Rule:** ALWAYS wrap `<Suspense>` with `<ErrorBoundary>` when the suspended children are `React.lazy()` components. Lazy chunk failures are silent whole-page crashes without this wrapper. The `ErrorBoundary` MUST sit OUTSIDE the `Suspense` — it needs to catch both render errors from mounted pages AND chunk-load failures from the lazy import itself.
 
-## Bug count: #038 – #158 (121 bugs total)
+---
+
+## BUG #159 — CRITICAL: Subscriptions never auto-expired
+
+**Files:** Supabase SQL (`expire_overdue_subscriptions()` function + `pg_cron` job)
+**Symptom:** Owners could use Scop forever on a free trial with no payment. Nothing automatically flipped `status` to `'expired'` when `trial_ends_at` or `expires_at` passed.
+**Root cause:** `status` was only ever updated manually (by an admin) or via the owner-facing flows (registration, recovery insert). No process checked the clock against `trial_ends_at`/`expires_at` and closed the loop. The frontend's existing fail-closed checks (`useSubscription.js` `isExpired`, `BranchManagerAuthContext` `ownerHasAccess`) were correctly built to react to `status = 'expired'`, but nothing server-side ever set it.
+**WRONG:**
+```
+-- Nothing. status only changed via manual admin action or at signup.
+```
+**CORRECT:**
+```sql
+CREATE OR REPLACE FUNCTION expire_overdue_subscriptions()
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  UPDATE public.subscriptions
+  SET status = 'expired'
+  WHERE (
+    (status = 'trial'  AND trial_ends_at < NOW())
+    OR (status = 'active' AND expires_at < NOW())
+  )
+  AND status != 'expired';
+END;
+$$;
+
+SELECT cron.schedule(
+  'expire-overdue-subscriptions',
+  '0 21 * * *',   -- 21:00 UTC = 00:00 Riyadh (UTC+3, no DST)
+  'SELECT expire_overdue_subscriptions()'
+);
+```
+**Rule:** Any time-based enforcement must have a server-side scheduled job — never rely on frontend checks alone for business-critical limits. A frontend `isExpired` check only enforces itself in browsers that are open and running that exact code; it does nothing to the underlying data. `SECURITY DEFINER` functions used this way must pin `SET search_path = public` (see BUG #056) to avoid search-path hijacking.
+
+## Bug count: #038 – #159 (122 bugs total)
