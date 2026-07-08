@@ -7,8 +7,5 @@ export async function uploadPhoto(file, branchId, taskId) {
     .from('task-photos')
     .upload(path, file, { upsert: true })
   if (error) throw error
-  const { data: urlData } = supabaseBranchManager.storage
-    .from('task-photos')
-    .getPublicUrl(data.path)
-  return urlData.publicUrl
+  return data.path
 }

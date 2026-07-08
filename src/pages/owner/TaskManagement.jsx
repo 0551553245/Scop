@@ -6,9 +6,29 @@ import { getCached, setCached, invalidateCache } from '../../lib/cache'
 import { useLanguage } from '../../context/LanguageContext'
 import { useSubscription } from '../../hooks/useSubscription'
 import { calcRate } from '../../lib/stats'
+import { useSignedUrl } from '../../hooks/useSignedUrl'
 import SubscriptionGuard from '../../components/SubscriptionGuard'
 import OwnerLayout from '../../components/OwnerLayout'
 import ErrorBanner from '../../components/ErrorBanner'
+
+const isFullUrl = (val) => val && (val.startsWith('http://') || val.startsWith('https://'))
+
+function SubmissionPhotoThumb({ photoUrl, onOpen }) {
+  const legacy    = isFullUrl(photoUrl)
+  const signedUrl = useSignedUrl(legacy ? null : photoUrl, supabaseOwner)
+  const src       = legacy ? photoUrl : signedUrl
+
+  if (!src) return <div style={{ width:80, height:80, borderRadius:10, background:'#F3F4F6' }} />
+
+  return (
+    <img
+      src={src}
+      loading="lazy"
+      onClick={() => onOpen(src)}
+      style={{ width:80, height:80, borderRadius:10, objectFit:'cover', cursor:'pointer', border:'1px solid #E5E7EB', display:'block' }}
+    />
+  )
+}
 
 const TEMPLATES = [
   { icon:'🌅', name:'Opening Checklist',  nameAr:'قائمة الافتتاح',    freq:'daily',   category:'opening'     },
@@ -254,8 +274,6 @@ export default function OwnerTaskManagement() {
       console.error('Delete failed:', err)
     }
   }
-
-  const isUrl = (url) => url && (url.startsWith('http://') || url.startsWith('https://'))
 
   // ── FILTERED TASKS ────────────────────────────────────────
   const filteredTasks = useMemo(() => {
@@ -512,7 +530,7 @@ export default function OwnerTaskManagement() {
                                                     {sub.note && (
                                                       <span style={{ fontSize:11, color:'#374151', fontStyle:'italic' }}>"{sub.note}"</span>
                                                     )}
-                                                    {sub.photo_url && isUrl(sub.photo_url) && (
+                                                    {sub.photo_url && (
                                                       <div style={{ marginTop:4 }}>
                                                         {!expandedPhotos[sub.id] ? (
                                                           <div
@@ -523,12 +541,7 @@ export default function OwnerTaskManagement() {
                                                           </div>
                                                         ) : (
                                                           <div style={{ position:'relative', display:'inline-block' }}>
-                                                            <img
-                                                              src={sub.photo_url}
-                                                              loading="lazy"
-                                                              onClick={() => setLightboxUrl(sub.photo_url)}
-                                                              style={{ width:80, height:80, borderRadius:10, objectFit:'cover', cursor:'pointer', border:'1px solid #E5E7EB', display:'block' }}
-                                                            />
+                                                            <SubmissionPhotoThumb photoUrl={sub.photo_url} onOpen={setLightboxUrl} />
                                                             <div
                                                               onClick={() => setExpandedPhotos(p => ({ ...p, [sub.id]: false }))}
                                                               style={{ position:'absolute', top:-6, right:-6, width:18, height:18, borderRadius:'50%', background:'#1B4332', color:'#fff', fontSize:10, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}
@@ -536,9 +549,6 @@ export default function OwnerTaskManagement() {
                                                           </div>
                                                         )}
                                                       </div>
-                                                    )}
-                                                    {sub.photo_url && !isUrl(sub.photo_url) && (
-                                                      <span style={{ fontSize:10, padding:'2px 8px', background:'#F3F4F6', color:'#9CA3AF', borderRadius:20, display:'inline-block' }}>📷 {isAr ? 'صورة قديمة' : 'Legacy photo'}</span>
                                                     )}
                                                   </div>
                                                 )
