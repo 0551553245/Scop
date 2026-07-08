@@ -45,13 +45,13 @@ export default function AdminAnalytics() {
     try {
       const now        = new Date()
       const today       = dayKey(now)
-      const last30      = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString()
+      const last90      = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000).toISOString()
       const last7       = new Date(now.getTime() - 7  * 24 * 60 * 60 * 1000).toISOString()
 
       const [branchesRes, taskSubsRes, fsSubsRes, scheduleRes] = await Promise.all([
         supabaseAdmin.from('branches').select('id, name, name_ar, city, owner_id').eq('is_active', true),
-        supabaseAdmin.from('task_submissions').select('id, branch_id, status, submitted_at').gte('submitted_at', last30),
-        supabaseAdmin.from('food_safety_submissions').select('id, branch_id, result, submitted_at').gte('submitted_at', last30),
+        supabaseAdmin.from('task_submissions').select('id, branch_id, status, submitted_at').gte('submitted_at', last90).limit(5000),
+        supabaseAdmin.from('food_safety_submissions').select('id, branch_id, result, submitted_at').gte('submitted_at', last90).limit(5000),
         supabaseAdmin.from('schedule_events').select('branch_id'),
       ])
 
