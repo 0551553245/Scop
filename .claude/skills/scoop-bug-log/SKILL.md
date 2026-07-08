@@ -1845,4 +1845,51 @@ const cacheKey = `bm-daily-tasks-${profile.id}-${today}`
 Only the cache key string changed — the actual Supabase query filters (`.eq('branch_id', branchId)`) are untouched and still correctly scope which rows are fetched.
 **Rule:** A cache key must be scoped to match the narrowest filter used in the query it caches. If a query is filtered by `submitted_by`/`profile.id`, the cache key MUST include `profile.id`, not just `branch_id` — even though the *fetch* also filters by branch. `branch_id`-only cache keys are only correct when the underlying query is genuinely branch-wide (e.g. `owner/Dashboard`-style aggregate stats, `bm-schedule` events, `bm-dashboard` team-wide stats) with no per-user filter. Check the actual `.eq()`/`.filter()` clauses on the query before picking a cache key — don't assume "branch page → branch-scoped key."
 
-## Bug count: #038 – #156 (119 bugs total)
+## BUG #157 — CRITICAL: Task photos publicly accessible via public storage bucket + stored public URLs
+
+**Files:** src/lib/upload.js, src/hooks/useSignedUrl.js (new), src/pages/owner/TaskManagement.jsx
+**Symptom:** Anyone with a task photo's URL could view it — no authentication required, no expiry, no revocation. A leaked or shared link exposed the photo forever.
+**Root cause:** `task-photos` storage bucket was `public: true`. `uploadPhoto()` called `.getPublicUrl()` after upload and returned the full public URL, which was stored directly in `task_submissions.photo_url`. No signed-URL code path existed anywhere in the codebase.
+**WRONG:**
+```js
+const { data, error } = await supabaseBranchManager.storage
+  .from('task-photos').upload(path, file, { upsert: true })
+if (error) throw error
+const { data: urlData } = supabaseBranchManager.storage
+  .from('task-photos').getPublicUrl(data.path)
+return urlData.publicUrl   // stored directly in photo_url — public forever
+```
+**CORRECT:**
+```js
+const { data, error } = await supabaseBranchManager.storage
+  .from('task-photos').upload(path, file, { upsert: true })
+if (error) throw error
+return data.path   // store the PATH, not a URL
+```
+Bucket flipped to `public: false`. New hook `useSignedUrl(path, client)` generates a signed URL with a 1-hour expiry and refreshes it before expiry. `SubmissionPhotoThumb` (in TaskManagement.jsx) checks whether `photo_url` is a legacy full URL (pre-existing rows, will 404 now — accepted) or a new storage path, and resolves the correct display source for each.
+**Rule:** NEVER use `getPublicUrl()` for any bucket holding sensitive/private content. Always store the storage PATH in the database, never the full URL. Always use `createSignedUrl()` with an explicit expiry when displaying private content. Check the bucket's `public` setting before deciding whether to store a URL or a path.
+
+---
+
+## BUG #158 — CRITICAL: Blank page on navigation after a lazy chunk load failure
+
+**Files:** src/App.jsx
+**Symptom:** Intermittent blank white page when navigating between pages, across all three panels, after the user was already logged in. Refreshing the page always fixed it. Distinct from BUG #142 (auth-state race specifically during login).
+**Root cause:** `<Suspense fallback={<PageLoader />}>` had no `ErrorBoundary` wrapping it. When a lazy-loaded route's chunk failed to load (network error, or a stale chunk hash after a Vercel redeploy replaced the old build's asset files), `React.lazy` threw an uncaught error during render. Suspense only handles the pending-promise case, not a rejected one — with nothing above it to catch the error, React unmounted the entire tree, producing a blank page. A full refresh fetched the current asset manifest and resolved correctly, masking the root cause.
+**WRONG:**
+```jsx
+<Suspense fallback={<PageLoader />}>
+  <Routes>{/* all lazy-loaded routes */}</Routes>
+</Suspense>
+```
+**CORRECT:**
+```jsx
+<ErrorBoundary>
+  <Suspense fallback={<PageLoader />}>
+    <Routes>{/* all lazy-loaded routes */}</Routes>
+  </Suspense>
+</ErrorBoundary>
+```
+**Rule:** ALWAYS wrap `<Suspense>` with `<ErrorBoundary>` when the suspended children are `React.lazy()` components. Lazy chunk failures are silent whole-page crashes without this wrapper. The `ErrorBoundary` MUST sit OUTSIDE the `Suspense` — it needs to catch both render errors from mounted pages AND chunk-load failures from the lazy import itself.
+
+## Bug count: #038 – #158 (121 bugs total)
