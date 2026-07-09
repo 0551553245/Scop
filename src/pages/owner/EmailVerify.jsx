@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabaseOwner } from '../../lib/supabase'
 import { useLanguage } from '../../context/LanguageContext'
+import { getPlatformSettings, getPlanLimits } from '../../lib/platformSettings'
 export default function EmailVerify() {
   const { isAr } = useLanguage()
   const [status, setStatus] = useState('loading')
@@ -61,12 +62,17 @@ export default function EmailVerify() {
         if (!existingSub) {
           const plan        = pending.plan || 'starter'
           const trialExpiry = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()
+
+          const settings = await getPlatformSettings(supabaseOwner)
+          const limits   = getPlanLimits(settings)
+          const planKey  = (plan === 'growth' || plan === 'pro') ? plan : 'starter'
+
           const { error: subErr } = await supabaseOwner.from('subscriptions').insert({
             owner_id:       userId,
             plan:           plan,
             status:         'trial',
-            branches_limit: 3,
-            managers_limit: 5,
+            branches_limit: limits[planKey].branches,
+            managers_limit: limits[planKey].managers,
             expires_at:     trialExpiry,
             trial_ends_at:  trialExpiry,
             started_at:     new Date().toISOString(),

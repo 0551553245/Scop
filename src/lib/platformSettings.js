@@ -40,9 +40,11 @@ export const DEFAULT_SETTINGS = {
 
 export function getPlanLimits(settings) {
   const s = { ...DEFAULT_SETTINGS, ...settings }
+  const starter = { branches: parseInt(s.starter_branches), managers: parseInt(s.starter_managers), price: parseInt(s.price_starter) }
   return {
-    trial:   { branches: 1,                            managers: 1,                            price: 0                          },
-    starter: { branches: parseInt(s.starter_branches), managers: parseInt(s.starter_managers), price: parseInt(s.price_starter)  },
+    // Trial mirrors starter's configured limits — never a separate hardcoded value.
+    trial:   { branches: starter.branches,             managers: starter.managers,             price: 0                          },
+    starter,
     growth:  { branches: parseInt(s.growth_branches),  managers: parseInt(s.growth_managers),  price: parseInt(s.price_growth)   },
     pro:     { branches: parseInt(s.pro_branches),     managers: parseInt(s.pro_managers),     price: parseInt(s.price_pro)      },
   }

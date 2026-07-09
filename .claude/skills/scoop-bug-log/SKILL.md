@@ -2004,4 +2004,21 @@ const pct       = calcRate(bDone, bExpected)
 ```
 **Rule:** Same rule as #161 — applies per-branch, not just to the page-level KPI. Any `useMemo`/calculation in this file that compares a period-accumulated `done`/`filtered` count against a `getExpectedForBranch`/`getTotalExpected` result must multiply that expected value by `numDays` first. Check every such pairing in a file before considering a period-based rate fix complete — this bug existed in two separate places here.
 
-## Bug count: #038 – #162 (125 bugs total)
+---
+
+## BUG #163 — CRITICAL: Trial subscription limits hardcoded in 3 places instead of reading platform_settings
+**Files:** src/pages/owner/EmailVerify.jsx, src/hooks/useSubscription.js, src/lib/platformSettings.js
+**Symptom:** Every new trial subscription got `branches_limit: 3, managers_limit: 5` regardless of which plan (starter/growth/pro) the owner selected during registration, and regardless of what admin had configured in `platform_settings`. Meanwhile `getPlanLimits(settings).trial` in `platformSettings.js` independently hardcoded `{ branches: 1, managers: 1 }` — a third, different value used anywhere the UI displayed "trial" limits. Three disconnected hardcoded numbers (3/5, 3/5, 1/1), none derived from `platform_settings`.
+**Root cause:**
+1. `EmailVerify.jsx`'s trial subscription insert had `branches_limit: 3, managers_limit: 5` as literals — `pending.plan` was stored in the `plan` column but never consulted for limits.
+2. `useSubscription.js`'s recovery insert (fires when a subscription row is missing on read) had the same `3`/`5` literals, independently duplicated.
+3. `platformSettings.js`'s `getPlanLimits()` computed `starter`/`growth`/`pro` correctly from the settings object but hardcoded `trial: { branches: 1, managers: 1 }` without reading settings at all.
+**Fix:**
+- `EmailVerify.jsx`: fetch `getPlatformSettings(supabaseOwner)` + `getPlanLimits(settings)`, map `pending.plan` to `'growth'`/`'pro'`/`'starter'` (default `'starter'` for trial/unrecognized), and insert `limits[planKey].branches`/`.managers`.
+- `useSubscription.js` recovery insert: same `getPlatformSettings` + `getPlanLimits(settings).starter` (no plan context available in this recovery path, so it uses starter-equivalent limits, consistent with the canonical trial shape from BUG #051/#097).
+- `platformSettings.js`: `getPlanLimits()` now derives `trial` from the already-computed `starter` object (`trial: { branches: starter.branches, managers: starter.managers, price: 0 }`) instead of a separate hardcoded literal — trial limits now automatically track whatever admin configures for starter.
+**Rule:** NEVER hardcode plan/trial limits as numeric literals anywhere. Every code path that inserts or computes subscription limits — insert sites AND display/computation helpers — MUST derive from `getPlatformSettings()` + `getPlanLimits()` in `src/lib/platformSettings.js`. Trial limits specifically must track the `starter` plan's configured values, not an independent constant, per BUG #059's original rule extended to the trial case.
+
+---
+
+## Bug count: #038 – #163 (126 bugs total)

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabaseOwner } from '../lib/supabase'
 import { useOwnerAuth } from '../context/OwnerAuthContext'
+import { getPlatformSettings, getPlanLimits } from '../lib/platformSettings'
 
 export function useSubscription() {
   const { profile } = useOwnerAuth()
@@ -20,12 +21,14 @@ export function useSubscription() {
       if (!data) {
         // Subscription row missing — registration insert failed silently. Recover now.
         const trialExpiry = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()
+        const settings = await getPlatformSettings(supabaseOwner)
+        const limits   = getPlanLimits(settings).starter
         const { error: insertErr } = await supabaseOwner.from('subscriptions').insert({
           owner_id:       profile.id,
           plan:           'trial',
           status:         'trial',
-          branches_limit: 3,
-          managers_limit: 5,
+          branches_limit: limits.branches,
+          managers_limit: limits.managers,
           expires_at:     trialExpiry,
           trial_ends_at:  trialExpiry,
           started_at:     new Date().toISOString(),
