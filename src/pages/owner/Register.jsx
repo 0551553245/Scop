@@ -221,6 +221,21 @@ export default function OwnerRegister() {
     setError('')
 
     const registrationFlow = async () => {
+      // Phone uniqueness check — prevents one person registering multiple
+      // trials with different emails but the same phone number.
+      const { data: existingPhone } = await supabaseTemp
+        .from('users')
+        .select('id')
+        .eq('phone', form.phone.trim())
+        .maybeSingle()
+
+      if (existingPhone) {
+        setError(isAr
+          ? 'هذا الرقم مسجل بالفعل. يرجى تسجيل الدخول أو التواصل معنا.'
+          : 'This phone number is already registered. Please sign in or contact support.')
+        return
+      }
+
       // Step 1: Create auth user with supabaseTemp
       const { data: authData, error: authErr } = await supabaseTemp.auth.signUp({
         email: form.email,
