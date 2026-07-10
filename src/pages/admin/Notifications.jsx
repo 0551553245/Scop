@@ -10,11 +10,12 @@ import ErrorBanner from '../../components/ErrorBanner'
 import { formatDateTime } from '../../lib/adminHelpers'
 
 const TARGETS = [
-  { key:'all',     en:'All Owners',    ar:'كل الملاك'        },
-  { key:'trial',   en:'Trial Only',    ar:'تجربة فقط'        },
-  { key:'starter', en:'Starter Plan',  ar:'خطة Starter'      },
-  { key:'growth',  en:'Growth Plan',   ar:'خطة Growth'       },
-  { key:'pro',     en:'Pro Plan',      ar:'خطة Pro'          },
+  { key:'all',        en:'All Owners',      ar:'كل الملاك'      },
+  { key:'trial',      en:'Trial Only',      ar:'تجربة فقط'      },
+  { key:'per_branch', en:'Per-Branch Plan', ar:'خطة لكل فرع'    },
+  { key:'starter',    en:'Starter Plan',    ar:'خطة Starter'    },
+  { key:'growth',     en:'Growth Plan',     ar:'خطة Growth'     },
+  { key:'pro',        en:'Pro Plan',        ar:'خطة Pro'        },
 ]
 
 const inputStyle = {
