@@ -4,7 +4,7 @@ import { supabaseAdmin } from '../../lib/supabase'
 import { useAdminAuth } from '../../context/AdminAuthContext'
 import { useLanguage } from '../../context/LanguageContext'
 import { getCached, setCached, invalidateCache } from '../../lib/cache'
-import { getPlatformSettings, getPlanLimits } from '../../lib/platformSettings'
+import { getPlatformSettings, getPerBranchPricing } from '../../lib/platformSettings'
 import AdminLayout from '../../components/AdminLayout'
 import ErrorBanner from '../../components/ErrorBanner'
 import { formatDate, daysLeft, calculateExpiry } from '../../lib/adminHelpers'
@@ -18,6 +18,7 @@ const TABS = [
 ]
 
 const PLAN_BADGE = {
+  per_branch: { bg:'#EFF6FF', color:'#1D4ED8' },
   starter: { bg:'#EFF6FF', color:'#1D4ED8' },
   growth:  { bg:'#F0FDF4', color:'#166534' },
   pro:     { bg:'#F5F3FF', color:'#7C3AED' },
@@ -62,16 +63,16 @@ export default function AdminSubscriptions() {
   const { isAr, toggleLang } = useLanguage()
 
   const [subscriptions, setSubscriptions] = useState([])
-  const [planLimits,    setPlanLimits]    = useState(getPlanLimits({}))
+  const [pricing,       setPricing]       = useState(getPerBranchPricing({}))
   const [loading, setLoading] = useState(true)
   const [error,   setError]   = useState('')
   const [tab,     setTab]     = useState('all')
 
-  const [actModal,  setActModal]  = useState(null)
-  const [actPlan,   setActPlan]   = useState('starter')
-  const [actAmount, setActAmount] = useState(0)
-  const [actSaving, setActSaving] = useState(false)
-  const [actErr,    setActErr]    = useState('')
+  const [actModal,       setActModal]       = useState(null)
+  const [actBranchCount, setActBranchCount] = useState(1)
+  const [actAmount,      setActAmount]      = useState(0)
+  const [actSaving,      setActSaving]      = useState(false)
+  const [actErr,         setActErr]         = useState('')
 
   const [busyId, setBusyId] = useState(null)
 
@@ -92,7 +93,7 @@ export default function AdminSubscriptions() {
     const cached = getCached(cacheKey)
     if (cached) {
       setSubscriptions(cached.subscriptions)
-      setPlanLimits(cached.planLimits)
+      setPricing(cached.pricing)
       setLoading(false)
       return
     }
@@ -113,8 +114,8 @@ export default function AdminSubscriptions() {
       if (subsRes.error)   throw subsRes.error
       if (ownersRes.error) throw ownersRes.error
 
-      const limits = getPlanLimits(settings)
-      setPlanLimits(limits)
+      const branchPricing = getPerBranchPricing(settings)
+      setPricing(branchPricing)
 
       const ownerMap = {}
       ;(ownersRes.data || []).forEach(o => { ownerMap[o.id] = o })
@@ -122,7 +123,7 @@ export default function AdminSubscriptions() {
       const subs = (subsRes.data || []).map(s => ({ ...s, owner: ownerMap[s.owner_id] || null }))
 
       setSubscriptions(subs)
-      setCached(cacheKey, { subscriptions: subs, planLimits: limits })
+      setCached(cacheKey, { subscriptions: subs, pricing: branchPricing })
 
     } catch (err) {
       console.error('Subscriptions fetch error:', err)
@@ -155,21 +156,22 @@ export default function AdminSubscriptions() {
   const activeSubs = subscriptions.filter(s => s.status === 'active')
   const trialSubs  = subscriptions.filter(s => s.status === 'trial' && new Date(s.expires_at) > now)
 
-  const mrr = activeSubs.reduce((sum, s) => sum + (planLimits[s.plan]?.price || 0), 0)
-  const arr = mrr * 12
+  // Works for both new per_branch rows (monthly_amount set) and legacy
+  // starter/growth/pro rows (monthly_amount null) — never assumes a plan name.
+  const subMonthly = (s) => s.monthly_amount ?? pricing.calculateMonthlyAmount(s.branches_limit || 0)
 
   const trialsExpiringWeek = trialSubs.filter(s => {
     const d = daysLeft(s.expires_at)
     return d !== null && d >= 0 && d <= 7
   }).length
 
-  const starterCount   = activeSubs.filter(s => s.plan === 'starter').length
-  const growthCount    = activeSubs.filter(s => s.plan === 'growth').length
-  const proCount       = activeSubs.filter(s => s.plan === 'pro').length
-  const starterRevenue = starterCount * (planLimits.starter?.price || 199)
-  const growthRevenue  = growthCount  * (planLimits.growth?.price  || 499)
-  const proRevenue     = proCount     * (planLimits.pro?.price     || 999)
-  const totalMrr       = starterRevenue + growthRevenue + proRevenue
+  const perBranchSubs    = activeSubs.filter(s => s.plan === 'per_branch')
+  const legacySubs       = activeSubs.filter(s => s.plan !== 'per_branch')
+  const perBranchRevenue = perBranchSubs.reduce((sum, s) => sum + subMonthly(s), 0)
+  const legacyRevenue    = legacySubs.reduce((sum, s) => sum + subMonthly(s), 0)
+  const totalMrr         = perBranchRevenue + legacyRevenue
+  const mrr = totalMrr
+  const arr = mrr * 12
 
   const filteredSubs = subscriptions.filter(s => {
     if (tab === 'all')     return true
@@ -183,14 +185,15 @@ export default function AdminSubscriptions() {
   // ── ACTIONS ────────────────────────────────────────────────────
   function openActivate(sub) {
     setActModal(sub)
-    setActPlan('starter')
-    setActAmount(planLimits.starter?.price ?? 0)
+    setActBranchCount(1)
+    setActAmount(pricing.calculateMonthlyAmount(1))
     setActErr('')
   }
 
-  function handlePlanChange(plan) {
-    setActPlan(plan)
-    setActAmount(planLimits[plan]?.price ?? 0)
+  function handleBranchCountChange(n) {
+    setActBranchCount(n)
+    if (pricing.isEnterprise(n)) return // enterprise = manual amount, no formula
+    setActAmount(pricing.calculateMonthlyAmount(n))
   }
 
   async function handleActivate(e) {
@@ -202,10 +205,11 @@ export default function AdminSubscriptions() {
       const { error: subErr } = await supabaseAdmin
         .from('subscriptions')
         .update({
-          plan:           actPlan,
+          plan:           'per_branch',
           status:         'active',
-          branches_limit: planLimits[actPlan].branches,
-          managers_limit: planLimits[actPlan].managers,
+          branches_limit: actBranchCount,
+          managers_limit: pricing.calculateManagersLimit(actBranchCount),
+          monthly_amount: Number(actAmount),
           expires_at:     expiresAt,
         })
         .eq('owner_id', actModal.owner_id)
@@ -215,7 +219,7 @@ export default function AdminSubscriptions() {
         .from('billing_history')
         .insert({
           owner_id: actModal.owner_id,
-          plan:     actPlan,
+          plan:     'per_branch',
           amount:   Number(actAmount),
           currency: 'SAR',
           status:   'paid',
@@ -223,7 +227,7 @@ export default function AdminSubscriptions() {
         })
       if (billErr) throw billErr
 
-      await logAction('subscription_activated', `Activated ${actPlan} plan for ${actModal.owner?.name}`, actModal.owner_id, 'subscription', { plan: actPlan, amount: Number(actAmount) })
+      await logAction('subscription_activated', `Activated per-branch plan (${actBranchCount} branches) for ${actModal.owner?.name}`, actModal.owner_id, 'subscription', { plan: 'per_branch', branches: actBranchCount, amount: Number(actAmount) })
       setActModal(null)
       invalidateCache(cacheKey)
       await fetchData()
@@ -349,61 +353,44 @@ export default function AdminSubscriptions() {
             </div>
           </div>
 
-          {/* ── REVENUE BY PLAN CHART ── */}
+          {/* ── REVENUE BREAKDOWN ── */}
           <div style={{ background:'#fff', border:'0.5px solid #E5E7EB', borderRadius:16, padding:20, marginBottom:20 }}>
             <div style={{ fontSize:14, fontWeight:700, color:'#111827', marginBottom:4 }}>
-              {isAr ? 'الإيراد حسب الخطة' : 'Revenue by Plan'}
+              {isAr ? 'تفصيل الإيراد' : 'Revenue Breakdown'}
             </div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:12, margin:'16px 0' }}>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, margin:'16px 0' }}>
 
-              {/* Starter */}
+              {/* Per-Branch */}
               <div style={{ background:'#EFF6FF', borderRadius:12, padding:'16px' }}>
                 <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
                   <div style={{ width:10, height:10, borderRadius:'50%', background:'#3B82F6', flexShrink:0 }} />
-                  <div style={{ fontSize:13, fontWeight:500, color:'#1D4ED8' }}>Starter</div>
+                  <div style={{ fontSize:13, fontWeight:500, color:'#1D4ED8' }}>{isAr ? 'لكل فرع' : 'Per-Branch'}</div>
                 </div>
                 <div style={{ fontSize:28, fontWeight:500, color:'#1D4ED8', marginBottom:4 }}>
-                  {starterRevenue.toLocaleString()} SAR
+                  {perBranchRevenue.toLocaleString()} SAR
                 </div>
                 <div style={{ fontSize:11, color:'#3B82F6' }}>
-                  {starterCount} × {(planLimits.starter?.price || 199).toLocaleString()} SAR/mo
+                  {perBranchSubs.length} {isAr ? 'مالك' : 'owners'}
                 </div>
                 <div style={{ marginTop:10, height:4, background:'rgba(59,130,246,0.2)', borderRadius:20, overflow:'hidden' }}>
-                  <div style={{ height:'100%', width: totalMrr > 0 ? `${Math.round(starterRevenue / totalMrr * 100)}%` : '0%', background:'#3B82F6', borderRadius:20, transition:'width 0.4s ease' }} />
+                  <div style={{ height:'100%', width: totalMrr > 0 ? `${Math.round(perBranchRevenue / totalMrr * 100)}%` : '0%', background:'#3B82F6', borderRadius:20, transition:'width 0.4s ease' }} />
                 </div>
               </div>
 
-              {/* Growth */}
-              <div style={{ background:'#F0FDF4', borderRadius:12, padding:'16px' }}>
-                <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
-                  <div style={{ width:10, height:10, borderRadius:'50%', background:'#1B4332', flexShrink:0 }} />
-                  <div style={{ fontSize:13, fontWeight:500, color:'#166534' }}>Growth</div>
-                </div>
-                <div style={{ fontSize:28, fontWeight:500, color:'#1B4332', marginBottom:4 }}>
-                  {growthRevenue.toLocaleString()} SAR
-                </div>
-                <div style={{ fontSize:11, color:'#166534' }}>
-                  {growthCount} × {(planLimits.growth?.price || 499).toLocaleString()} SAR/mo
-                </div>
-                <div style={{ marginTop:10, height:4, background:'rgba(27,67,50,0.15)', borderRadius:20, overflow:'hidden' }}>
-                  <div style={{ height:'100%', width: totalMrr > 0 ? `${Math.round(growthRevenue / totalMrr * 100)}%` : '0%', background:'#1B4332', borderRadius:20, transition:'width 0.4s ease' }} />
-                </div>
-              </div>
-
-              {/* Pro */}
+              {/* Legacy plans (starter/growth/pro rows predating per-branch pricing) */}
               <div style={{ background:'#F5F3FF', borderRadius:12, padding:'16px' }}>
                 <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
                   <div style={{ width:10, height:10, borderRadius:'50%', background:'#7C3AED', flexShrink:0 }} />
-                  <div style={{ fontSize:13, fontWeight:500, color:'#6D28D9' }}>Pro</div>
+                  <div style={{ fontSize:13, fontWeight:500, color:'#6D28D9' }}>{isAr ? 'خطط قديمة' : 'Legacy Plans'}</div>
                 </div>
                 <div style={{ fontSize:28, fontWeight:500, color:'#7C3AED', marginBottom:4 }}>
-                  {proRevenue.toLocaleString()} SAR
+                  {legacyRevenue.toLocaleString()} SAR
                 </div>
                 <div style={{ fontSize:11, color:'#7C3AED' }}>
-                  {proCount} × {(planLimits.pro?.price || 999).toLocaleString()} SAR/mo
+                  {legacySubs.length} {isAr ? 'مالك' : 'owners'}
                 </div>
                 <div style={{ marginTop:10, height:4, background:'rgba(124,58,237,0.15)', borderRadius:20, overflow:'hidden' }}>
-                  <div style={{ height:'100%', width: totalMrr > 0 ? `${Math.round(proRevenue / totalMrr * 100)}%` : '0%', background:'#7C3AED', borderRadius:20, transition:'width 0.4s ease' }} />
+                  <div style={{ height:'100%', width: totalMrr > 0 ? `${Math.round(legacyRevenue / totalMrr * 100)}%` : '0%', background:'#7C3AED', borderRadius:20, transition:'width 0.4s ease' }} />
                 </div>
               </div>
 
@@ -441,6 +428,7 @@ export default function AdminSubscriptions() {
                       {[
                         isAr?'المطعم':'Restaurant',
                         isAr?'الخطة':'Plan',
+                        isAr?'المبلغ':'Amount',
                         isAr?'الحالة':'Status',
                         isAr?'تاريخ الانتهاء':'Expires',
                         isAr?'الأيام المتبقية':'Days Left',
@@ -453,6 +441,7 @@ export default function AdminSubscriptions() {
                   <tbody>
                     {filteredSubs.map(s => {
                       const planBadge   = PLAN_BADGE[s.plan]
+                      const isPerBranch = s.plan === 'per_branch'
                       const statusBadge = STATUS_BADGE[s.status]
                       const d           = daysLeft(s.expires_at)
                       const dBadge      = daysBadge(d)
@@ -471,12 +460,15 @@ export default function AdminSubscriptions() {
                           </td>
                           <td style={{ padding:'12px 14px' }}>
                             {planBadge ? (
-                              <span style={{ fontSize:11, fontWeight:600, padding:'3px 10px', borderRadius:20, background:planBadge.bg, color:planBadge.color, textTransform:'capitalize' }}>
-                                {s.plan}
+                              <span style={{ fontSize:11, fontWeight:600, padding:'3px 10px', borderRadius:20, background:planBadge.bg, color:planBadge.color, textTransform: isPerBranch ? 'none' : 'capitalize' }}>
+                                {isPerBranch ? `${s.branches_limit ?? '—'} ${isAr ? 'فروع' : 'branches'}` : s.plan}
                               </span>
                             ) : (
                               <span style={{ fontSize:12, color:'#6B7280', textTransform:'capitalize' }}>{s.plan || '—'}</span>
                             )}
+                          </td>
+                          <td style={{ padding:'12px 14px', color:'#374151', whiteSpace:'nowrap' }}>
+                            {subMonthly(s).toLocaleString()} SAR
                           </td>
                           <td style={{ padding:'12px 14px' }}>
                             {statusBadge && (
@@ -558,12 +550,31 @@ export default function AdminSubscriptions() {
 
             <form onSubmit={handleActivate} noValidate>
               <div style={{ marginBottom:12 }}>
-                <label style={labelStyle}>{isAr ? 'الخطة' : 'Plan'}</label>
-                <select value={actPlan} onChange={e => handlePlanChange(e.target.value)} style={{ ...inputStyle, cursor:'pointer' }}>
-                  <option value="starter">Starter</option>
-                  <option value="growth">Growth</option>
-                  <option value="pro">Pro</option>
-                </select>
+                <label style={labelStyle}>{isAr ? 'عدد الفروع' : 'Branch Count'}</label>
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(5, 1fr)', gap:6, marginBottom:6 }}>
+                  {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => (
+                    <button key={n} type="button" onClick={() => handleBranchCountChange(n)}
+                      style={{
+                        padding:'8px 0', fontSize:13, fontWeight:600,
+                        background: !pricing.isEnterprise(actBranchCount) && actBranchCount === n ? '#1B4332' : '#fff',
+                        color:      !pricing.isEnterprise(actBranchCount) && actBranchCount === n ? '#fff'    : '#111827',
+                        border: !pricing.isEnterprise(actBranchCount) && actBranchCount === n ? '1.5px solid #1B4332' : '0.5px solid #E5E7EB',
+                        borderRadius:8, cursor:'pointer', fontFamily:'inherit',
+                      }}>
+                      {n}
+                    </button>
+                  ))}
+                </div>
+                <button type="button" onClick={() => handleBranchCountChange(10)}
+                  style={{
+                    width:'100%', padding:'8px 0', fontSize:12, fontWeight:600,
+                    background: pricing.isEnterprise(actBranchCount) ? '#1B4332' : '#fff',
+                    color:      pricing.isEnterprise(actBranchCount) ? '#fff'    : '#111827',
+                    border: pricing.isEnterprise(actBranchCount) ? '1.5px solid #1B4332' : '0.5px solid #E5E7EB',
+                    borderRadius:8, cursor:'pointer', fontFamily:'inherit',
+                  }}>
+                  {isAr ? '١٠+ (مؤسسات)' : '10+ (Enterprise)'}
+                </button>
               </div>
               <div style={{ marginBottom:20 }}>
                 <label style={labelStyle}>{isAr ? 'المبلغ (ريال)' : 'Amount (SAR)'}</label>

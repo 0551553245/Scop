@@ -2021,4 +2021,14 @@ const pct       = calcRate(bDone, bExpected)
 
 ---
 
-## Bug count: #038 – #163 (126 bugs total)
+---
+
+## BUG #164 — MIGRATION: Starter/Growth/Pro fixed plans replaced with per-branch pricing
+**Files:** src/lib/platformSettings.js, src/pages/owner/Register.jsx, src/pages/owner/EmailVerify.jsx, src/hooks/useSubscription.js, src/pages/owner/Subscription.jsx, src/pages/owner/Branches.jsx, src/pages/owner/Managers.jsx, src/pages/admin/Restaurants.jsx, src/pages/admin/Subscriptions.jsx, src/pages/admin/Dashboard.jsx, src/pages/Landing.jsx, supabase/migrations/009_per_branch_pricing_settings.sql
+**WRONG:** Subscription plans were Starter/Growth/Pro with fixed limits hardcoded in 3 disconnected places (`EmailVerify.jsx` literal `3`/`5`, `useSubscription.js` recovery insert literal `3`/`5`, `platformSettings.js`'s `getPlanLimits().trial` literal `1`/`1`). Registration plan choice (`pending.plan`) was stored but never actually consulted when setting `branches_limit`/`managers_limit` — every trial got the same hardcoded numbers regardless of what the owner picked or what admin had configured in `platform_settings`.
+**CORRECT:** Per-branch pricing — 50 SAR/branch/month, 2 managers/branch, 10+ branches routed to enterprise/contact-sales instead of self-serve checkout. All limits (`branches_limit`, `managers_limit`, `monthly_amount`) are calculated as `branch_count × platform_settings values` via `getPerBranchPricing()` in `src/lib/platformSettings.js`, added alongside (not replacing) the existing `getPlanLimits()` until every consumer was migrated. `subscriptions.plan` is now the literal string `'per_branch'` for all new signups and admin activations; legacy `starter`/`growth`/`pro`/`trial` rows are left as-is (not force-migrated) and every read path falls back to `monthly_amount ?? pricing.calculateMonthlyAmount(branches_limit)` so it never needs to know the old tier names.
+**Rule:** Never hardcode subscription limits or prices as numeric literals anywhere in the codebase. Always derive them from `platform_settings` via `getPerBranchPricing()` (or `getPlanLimits()` for anything still reading legacy tier data) so admin can adjust pricing/limits from Settings without a code change. When migrating a pricing model, add the new config/helper additively first, migrate all insert sites as one atomic unit (they must never disagree on shape — see BUG #163), then migrate every display/read/analytics surface, and only remove the old path once every consumer is confirmed switched.
+
+---
+
+## Bug count: #038 – #164 (127 bugs total)

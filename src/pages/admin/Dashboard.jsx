@@ -5,7 +5,7 @@ import { useAdminAuth } from '../../context/AdminAuthContext'
 import { useLanguage } from '../../context/LanguageContext'
 import { getCached, setCached, invalidateCache } from '../../lib/cache'
 import { calcRate } from '../../lib/stats'
-import { getPlanLimits } from '../../lib/platformSettings'
+import { getPerBranchPricing } from '../../lib/platformSettings'
 import AdminLayout from '../../components/AdminLayout'
 import ErrorBanner from '../../components/ErrorBanner'
 import { daysLeft } from '../../lib/adminHelpers'
@@ -176,7 +176,7 @@ export default function AdminDashboard() {
         settingsRes,
       ] = await Promise.all([
         supabaseAdmin.from('users').select('id, name, phone, created_at, is_active').eq('role', 'owner').limit(500),
-        supabaseAdmin.from('subscriptions').select('id, owner_id, plan, status, expires_at, trial_ends_at, branches_limit, started_at').limit(500),
+        supabaseAdmin.from('subscriptions').select('id, owner_id, plan, status, expires_at, trial_ends_at, branches_limit, monthly_amount, started_at').limit(500),
         supabaseAdmin.from('branches').select('id, owner_id, is_active').eq('is_active', true).limit(500),
         supabaseAdmin.from('users').select('id, branch_id, is_active').eq('role', 'branch_manager').eq('is_active', true).limit(500),
         supabaseAdmin.from('billing_history').select('amount, plan, paid_at, status').eq('status', 'paid').gte('paid_at', lastMonthStart).order('paid_at', { ascending: true }),
@@ -193,8 +193,11 @@ export default function AdminDashboard() {
       if (newThisMonthRes.error) throw newThisMonthRes.error
       if (settingsRes.error)     throw settingsRes.error
 
-      const settings   = Object.fromEntries((settingsRes.data || []).map(s => [s.key, s.value]))
-      const planLimits = getPlanLimits(settings)
+      const settings = Object.fromEntries((settingsRes.data || []).map(s => [s.key, s.value]))
+      const pricing  = getPerBranchPricing(settings)
+      // Works for both new per_branch rows (monthly_amount set) and legacy
+      // starter/growth/pro rows (monthly_amount null) — never assumes a plan name.
+      const subMonthly = (s) => s.monthly_amount ?? pricing.calculateMonthlyAmount(s.branches_limit || 0)
 
       const owners   = ownersRes.data   || []
       const subs     = subsRes.data     || []
@@ -210,7 +213,7 @@ export default function AdminDashboard() {
       const blockedSubs = subs.filter(s => s.status === 'blocked')
 
       // ── MRR + ARR ──
-      const mrr = activeSubs.reduce((sum, s) => sum + (planLimits[s.plan]?.price || 0), 0)
+      const mrr = activeSubs.reduce((sum, s) => sum + subMonthly(s), 0)
       const arr = mrr * 12
 
       // ── MRR % change from billing history ──
@@ -242,11 +245,12 @@ export default function AdminDashboard() {
         monthlyRevenue.push({ label: d.toLocaleDateString('en-US', { month: 'short' }), revenue })
       }
 
-      // ── revenue by plan ──
-      const revenueByPlan = {
-        starter: { count: activeSubs.filter(s => s.plan === 'starter').length, price: planLimits.starter?.price || 0 },
-        growth:  { count: activeSubs.filter(s => s.plan === 'growth').length,  price: planLimits.growth?.price  || 0 },
-        pro:     { count: activeSubs.filter(s => s.plan === 'pro').length,     price: planLimits.pro?.price     || 0 },
+      // ── revenue by segment (per-branch vs legacy tier plans) ──
+      const perBranchActive  = activeSubs.filter(s => s.plan === 'per_branch')
+      const legacyActive     = activeSubs.filter(s => s.plan !== 'per_branch')
+      const revenueBySegment = {
+        per_branch: { count: perBranchActive.length, revenue: perBranchActive.reduce((s, x) => s + subMonthly(x), 0) },
+        legacy:     { count: legacyActive.length,     revenue: legacyActive.reduce((s, x) => s + subMonthly(x), 0) },
       }
 
       const payload = {
@@ -262,7 +266,7 @@ export default function AdminDashboard() {
         atRiskOwners,
         newThisMonth:        newThisMonthRes.data || [],
         monthlyRevenue,
-        revenueByPlan,
+        revenueBySegment,
       }
 
       setDashData(payload)
@@ -320,7 +324,7 @@ export default function AdminDashboard() {
     mrr = 0, arr = 0, mrrChangePct = 0,
     trialsExpiringSoon = [], dailyActive = 0,
     atRiskOwners = [], newThisMonth = [],
-    monthlyRevenue = [], revenueByPlan = {},
+    monthlyRevenue = [], revenueBySegment = {},
   } = dashData || {}
 
   const engagementPct = calcRate(dailyActive, totalOwners)
@@ -413,19 +417,21 @@ export default function AdminDashboard() {
               </div>
               <LineChart data={monthlyRevenue} isAr={isAr} />
 
-              {/* Plan breakdown */}
+              {/* Segment breakdown */}
               <div style={{ marginTop:16, display:'flex', flexDirection:'column', gap:8 }}>
-                {Object.entries(revenueByPlan).map(([plan, { count, price }]) => {
-                  const rev = count * price
-                  const pct = mrr > 0 ? Math.round((rev / mrr) * 100) : 0
+                {[
+                  { key: 'per_branch', label: isAr ? 'لكل فرع'   : 'Per-Branch', ...revenueBySegment.per_branch },
+                  { key: 'legacy',     label: isAr ? 'خطط قديمة' : 'Legacy',     ...revenueBySegment.legacy },
+                ].map(({ key, label, count = 0, revenue = 0 }) => {
+                  const pct = mrr > 0 ? Math.round((revenue / mrr) * 100) : 0
                   return (
-                    <div key={plan} style={{ display:'flex', alignItems:'center', gap:8 }}>
-                      <div style={{ width:52, fontSize:11, color:'#6B7280', textTransform:'capitalize', flexShrink:0 }}>{plan}</div>
+                    <div key={key} style={{ display:'flex', alignItems:'center', gap:8 }}>
+                      <div style={{ width:66, fontSize:11, color:'#6B7280', flexShrink:0 }}>{label}</div>
                       <div style={{ flex:1, height:5, background:'#F0FDF4', borderRadius:3 }}>
                         <div style={{ width:`${pct}%`, height:'100%', background:'#1B4332', borderRadius:3 }} />
                       </div>
-                      <div style={{ width:90, fontSize:11, color:'#374151', textAlign:'end', flexShrink:0 }}>
-                        {count} × {fmtSAR(price)} = <span style={{ fontWeight:600 }}>{fmtSAR(rev)}</span>
+                      <div style={{ width:100, fontSize:11, color:'#374151', textAlign:'end', flexShrink:0 }}>
+                        {count} × <span style={{ fontWeight:600 }}>{fmtSAR(revenue)}</span>
                       </div>
                     </div>
                   )
@@ -550,7 +556,7 @@ export default function AdminDashboard() {
                             {owner?.name || sub.owner_id}
                           </div>
                           <div style={{ fontSize:11, color:'#6B7280', marginTop:2 }}>
-                            {sub.plan} · {bCount} {isAr ? 'فرع' : 'branch'}
+                            {bCount} {isAr ? 'فرع' : 'branch'}
                           </div>
                         </div>
                         <div style={{ display:'flex', alignItems:'center', gap:6, flexShrink:0 }}>

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabaseOwner } from '../../lib/supabase'
 import { useLanguage } from '../../context/LanguageContext'
-import { getPlatformSettings, getPlanLimits } from '../../lib/platformSettings'
+import { getPlatformSettings, getPerBranchPricing } from '../../lib/platformSettings'
 export default function EmailVerify() {
   const { isAr } = useLanguage()
   const [status, setStatus] = useState('loading')
@@ -60,19 +60,19 @@ export default function EmailVerify() {
           .from('subscriptions').select('id').eq('owner_id', userId).maybeSingle()
 
         if (!existingSub) {
-          const plan        = pending.plan || 'starter'
+          const branchCount = pending.branch_count || 1
           const trialExpiry = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()
 
           const settings = await getPlatformSettings(supabaseOwner)
-          const limits   = getPlanLimits(settings)
-          const planKey  = (plan === 'growth' || plan === 'pro') ? plan : 'starter'
+          const pricing  = getPerBranchPricing(settings)
 
           const { error: subErr } = await supabaseOwner.from('subscriptions').insert({
             owner_id:       userId,
-            plan:           plan,
+            plan:           'per_branch',
             status:         'trial',
-            branches_limit: limits[planKey].branches,
-            managers_limit: limits[planKey].managers,
+            branches_limit: branchCount,
+            managers_limit: pricing.calculateManagersLimit(branchCount),
+            monthly_amount: pricing.calculateMonthlyAmount(branchCount),
             expires_at:     trialExpiry,
             trial_ends_at:  trialExpiry,
             started_at:     new Date().toISOString(),

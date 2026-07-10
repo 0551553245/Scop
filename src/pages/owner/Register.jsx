@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { supabaseOwner, supabaseTemp } from '../../lib/supabase'
 import { useLanguage } from '../../context/LanguageContext'
-import { getPlatformSettings, getPlanLimits } from '../../lib/platformSettings'
+import { getPlatformSettings, getPerBranchPricing } from '../../lib/platformSettings'
 
 const CITIES = [
   { en: 'Jeddah',  ar: 'جدة' },
@@ -141,8 +141,8 @@ export default function OwnerRegister() {
   const { isAr, toggleLang } = useLanguage()
 
   const [step, setStep] = useState(1)
-  const [selectedPlan, setSelectedPlan] = useState('starter')
-  const [planLimits, setPlanLimits] = useState(getPlanLimits({}))
+  const [branchCount, setBranchCount] = useState(1)
+  const [pricing, setPricing] = useState(getPerBranchPricing({}))
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [showPass, setShowPass] = useState(false)
@@ -150,7 +150,7 @@ export default function OwnerRegister() {
 
   useEffect(() => {
     getPlatformSettings(supabaseOwner).then(settings => {
-      setPlanLimits(getPlanLimits(settings))
+      setPricing(getPerBranchPricing(settings))
     }).catch(() => {})
   }, [])
 
@@ -217,6 +217,7 @@ export default function OwnerRegister() {
   }
 
   async function handleRegister() {
+    if (pricing.isEnterprise(branchCount)) return // enterprise tier has no self-serve price — contact sales only
     setLoading(true)
     setError('')
 
@@ -263,7 +264,7 @@ export default function OwnerRegister() {
           restaurantName:   form.restaurantName,
           restaurantNameAr: form.restaurantNameAr || form.restaurantName,
           city:             form.city,
-          plan:             selectedPlan,
+          branch_count:     branchCount,
         }))
         setEmailSent(form.email)
         return
@@ -323,10 +324,11 @@ export default function OwnerRegister() {
         if (!existingSub) {
           const { error: subErr } = await supabaseOwner.from('subscriptions').insert({
             owner_id:       userId,
-            plan:           selectedPlan,
+            plan:           'per_branch',
             status:         'trial',
-            branches_limit: planLimits[selectedPlan]?.branches ?? 1,
-            managers_limit: planLimits[selectedPlan]?.managers ?? 1,
+            branches_limit: branchCount,
+            managers_limit: pricing.calculateManagersLimit(branchCount),
+            monthly_amount: pricing.calculateMonthlyAmount(branchCount),
             expires_at:     trialExpiry,
             trial_ends_at:  trialExpiry,
             started_at:     new Date().toISOString(),
@@ -613,11 +615,11 @@ export default function OwnerRegister() {
 
   // ── STEP 2 ─────────────────────────────────────────────────────
   if (step === 2) {
-    const plans = [
-      { key: 'starter', nameEn: 'Starter', nameAr: 'المبتدئ', descEn: '1 branch · 1 manager',              descAr: '١ فرع · ١ مدير',                   price: planLimits.starter?.price ?? 199, badge: null },
-      { key: 'growth',  nameEn: 'Growth',  nameAr: 'النمو',    descEn: 'Up to 5 branches · 5 managers',      descAr: 'حتى ٥ فروع · ٥ مدراء',             price: planLimits.growth?.price  ?? 499, badge: { en: 'Most popular', ar: 'الأكثر شيوعاً' } },
-      { key: 'pro',     nameEn: 'Pro',     nameAr: 'المتقدم',  descEn: 'Up to 15 branches · Unlimited mgrs', descAr: 'حتى ١٥ فرعاً · مدراء غير محدودين', price: planLimits.pro?.price     ?? 999, badge: null },
-    ]
+    const isEnterprise  = pricing.isEnterprise(branchCount)
+    const monthlyAmount = pricing.calculateMonthlyAmount(branchCount)
+    const branchOptions = [1, 2, 3, 4, 5, 6, 7, 8, 9]
+    const whatsappLink  = 'https://wa.me/966551553245'
+
     const features = isAr ? [
       'مهام يومية وأسبوعية وشهرية',
       'فحوصات سلامة الغذاء وسجلات الحرارة',
@@ -646,10 +648,10 @@ export default function OwnerRegister() {
 
             <div style={{ marginBottom: 20 }}>
               <h2 style={{ fontSize: 20, fontWeight: 600, color: '#111827', margin: '0 0 4px' }}>
-                {isAr ? 'اختر خطتك' : 'Choose Your Plan'}
+                {isAr ? 'كم عدد فروعك؟' : 'How many branches do you have?'}
               </h2>
               <p style={{ fontSize: 13, color: '#6B7280', margin: 0 }}>
-                {isAr ? 'جميع الخطط تشمل نفس المميزات' : 'All plans include the same features'}
+                {isAr ? `${pricing.pricePerBranch} ر.س لكل فرع شهرياً` : `${pricing.pricePerBranch} SAR per branch, per month`}
               </p>
             </div>
 
@@ -665,66 +667,86 @@ export default function OwnerRegister() {
               ))}
             </div>
 
-            {/* Plan cards */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
-              {plans.map(plan => (
-                <div key={plan.key} onClick={() => setSelectedPlan(plan.key)}
+            {/* Branch count selector */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 8, marginBottom: 8 }}>
+              {branchOptions.map(n => (
+                <button key={n} type="button" onClick={() => setBranchCount(n)}
                   style={{
-                    background: '#fff',
-                    border: selectedPlan === plan.key ? '1.5px solid #1B4332' : '0.5px solid #E5E7EB',
-                    borderRadius: 12, padding: '12px 16px', cursor: 'pointer',
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    transition: 'border-color 0.15s',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <div style={{
-                      width: 18, height: 18, borderRadius: '50%', flexShrink: 0,
-                      border: selectedPlan === plan.key ? '5px solid #1B4332' : '2px solid #D1D5DB',
-                      transition: 'border 0.15s',
-                    }} />
-                    <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <span style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>
-                          {isAr ? plan.nameAr : plan.nameEn}
-                        </span>
-                        {plan.badge && (
-                          <span style={{ fontSize: 9, fontWeight: 600, background: '#1B4332', color: '#fff', borderRadius: 20, padding: '1px 7px' }}>
-                            {isAr ? plan.badge.ar : plan.badge.en}
-                          </span>
-                        )}
-                      </div>
-                      <div style={{ fontSize: 11, color: '#6B7280', marginTop: 1 }}>
-                        {isAr ? plan.descAr : plan.descEn}
-                      </div>
-                    </div>
-                  </div>
-                  <div style={{ textAlign: isAr ? 'left' : 'right', flexShrink: 0 }}>
-                    <span style={{ fontSize: 16, fontWeight: 700, color: '#111827' }}>{plan.price}</span>
-                    <span style={{ fontSize: 10, color: '#6B7280' }}> {isAr ? 'ر.س/شهر' : 'SAR/mo'}</span>
-                  </div>
-                </div>
+                    padding: '12px 0', fontSize: 15, fontWeight: 600,
+                    background: !isEnterprise && branchCount === n ? '#1B4332' : '#fff',
+                    color:      !isEnterprise && branchCount === n ? '#fff'    : '#111827',
+                    border: !isEnterprise && branchCount === n ? '1.5px solid #1B4332' : '0.5px solid #E5E7EB',
+                    borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s',
+                  }}>
+                  {n}
+                </button>
               ))}
             </div>
 
-            <div style={{ textAlign: 'center', fontSize: 11, color: '#6B7280', marginBottom: 14 }}>
-              {isAr ? '١٤ يوم مجاناً · لا رسوم حتى انتهاء الفترة · إلغاء في أي وقت' : '14-day free trial · No charge until trial ends · Cancel anytime'}
-            </div>
+            <button type="button" onClick={() => setBranchCount(10)}
+              style={{
+                width: '100%', padding: '12px 16px', marginBottom: 14,
+                background: isEnterprise ? '#1B4332' : '#fff',
+                color:      isEnterprise ? '#fff'    : '#111827',
+                border: isEnterprise ? '1.5px solid #1B4332' : '0.5px solid #E5E7EB',
+                borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                fontFamily: 'inherit', transition: 'all 0.15s',
+              }}>
+              {isAr ? '١٠+ فروع (مؤسسات)' : '10+ branches (Enterprise)'}
+            </button>
+
+            {!isEnterprise ? (
+              <div style={{ background: '#F0FDF4', border: '0.5px solid #BBF7D0', borderRadius: 12, padding: '14px 16px', marginBottom: 14, textAlign: 'center' }}>
+                <div style={{ fontSize: 12, color: '#6B7280', marginBottom: 4 }}>
+                  {isAr
+                    ? `${branchCount} ${branchCount === 1 ? 'فرع' : 'فروع'} × ${pricing.pricePerBranch} ر.س`
+                    : `${branchCount} ${branchCount === 1 ? 'branch' : 'branches'} × ${pricing.pricePerBranch} SAR`}
+                </div>
+                <div style={{ fontSize: 22, fontWeight: 700, color: '#1B4332' }}>
+                  {monthlyAmount} <span style={{ fontSize: 12, fontWeight: 500 }}>{isAr ? 'ر.س/شهر' : 'SAR/mo'}</span>
+                </div>
+              </div>
+            ) : (
+              <div style={{ background: '#FFFBEB', border: '0.5px solid #FDE68A', borderRadius: 12, padding: '14px 16px', marginBottom: 14, textAlign: 'center' }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#92400E', marginBottom: 8 }}>
+                  {isAr ? 'تواصل معنا لأسعار المؤسسات' : 'Contact us for enterprise pricing'}
+                </div>
+                <a href={whatsappLink} target="_blank" rel="noopener noreferrer"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '9px 16px', background: '#25D366', color: '#fff', borderRadius: 10, fontSize: 12, fontWeight: 600, textDecoration: 'none' }}>
+                  {isAr ? 'واتساب: 966551553245+' : 'WhatsApp: +966551553245'}
+                </a>
+              </div>
+            )}
+
+            {!isEnterprise && (
+              <div style={{ textAlign: 'center', fontSize: 11, color: '#6B7280', marginBottom: 14 }}>
+                {isAr
+                  ? `١٤ يوم مجاناً، ثم ${monthlyAmount} ر.س/شهر · إلغاء في أي وقت`
+                  : `14 days free, then ${monthlyAmount} SAR/month · Cancel anytime`}
+              </div>
+            )}
 
             <ErrorBanner msg={error} />
 
-            <button onClick={handleRegister} disabled={loading}
-              style={{ width: '100%', padding: '11px 20px', background: loading ? '#6B9E83' : '#1B4332', color: '#fff', border: 'none', borderRadius: 10, fontSize: 13, fontWeight: 500, cursor: loading ? 'not-allowed' : 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 8 }}>
-              {loading && (
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ animation: 'spin 0.8s linear infinite' }}>
-                  <circle cx="12" cy="12" r="10" stroke="rgba(255,255,255,0.3)" strokeWidth="3"/>
-                  <path d="M12 2a10 10 0 0110 10" stroke="#fff" strokeWidth="3" strokeLinecap="round"/>
-                </svg>
-              )}
-              {loading
-                ? (isAr ? 'جارٍ الإنشاء...' : 'Creating account...')
-                : (isAr ? 'ابدأ التجربة المجانية ←' : 'Start free trial →')}
-            </button>
+            {!isEnterprise ? (
+              <button onClick={handleRegister} disabled={loading}
+                style={{ width: '100%', padding: '11px 20px', background: loading ? '#6B9E83' : '#1B4332', color: '#fff', border: 'none', borderRadius: 10, fontSize: 13, fontWeight: 500, cursor: loading ? 'not-allowed' : 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 8 }}>
+                {loading && (
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ animation: 'spin 0.8s linear infinite' }}>
+                    <circle cx="12" cy="12" r="10" stroke="rgba(255,255,255,0.3)" strokeWidth="3"/>
+                    <path d="M12 2a10 10 0 0110 10" stroke="#fff" strokeWidth="3" strokeLinecap="round"/>
+                  </svg>
+                )}
+                {loading
+                  ? (isAr ? 'جارٍ الإنشاء...' : 'Creating account...')
+                  : (isAr ? 'ابدأ التجربة المجانية ←' : 'Start free trial →')}
+              </button>
+            ) : (
+              <a href={whatsappLink} target="_blank" rel="noopener noreferrer"
+                style={{ width: '100%', boxSizing: 'border-box', padding: '11px 20px', background: '#1B4332', color: '#fff', border: 'none', borderRadius: 10, fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 8, textDecoration: 'none' }}>
+                {isAr ? 'تواصل معنا عبر واتساب ←' : 'Contact us on WhatsApp →'}
+              </a>
+            )}
 
             <button onClick={() => { setStep(1); setError('') }}
               style={{ width: '100%', padding: '10px', background: 'transparent', color: '#6B7280', border: '0.5px solid #E5E7EB', borderRadius: 10, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>

@@ -89,42 +89,18 @@ const HOW = {
 }
 
 const PRICING = {
-  tag:     { en: 'Pricing', ar: 'الأسعار' },
-  title:   { en: 'Simple, transparent pricing', ar: 'أسعار بسيطة وشفافة' },
-  popular: { en: 'Most popular', ar: 'الأكثر شيوعاً' },
-  cta:     { en: 'Start free trial', ar: 'ابدأ تجربتك المجانية' },
-  mo:      { en: '/mo', ar: '/شهر' },
-  plans: [
-    {
-      name: { en: 'Starter', ar: 'المبتدئ' },
-      price: 99,
-      desc: { en: '1 branch · 1 manager', ar: 'فرع واحد · مدير واحد' },
-      features: {
-        en: ['Daily & weekly tasks', 'Food safety tracking', 'Basic reports'],
-        ar: ['المهام اليومية والأسبوعية', 'تتبع سلامة الغذاء', 'تقارير أساسية'],
-      },
-      featured: false,
-    },
-    {
-      name: { en: 'Growth', ar: 'النمو' },
-      price: 199,
-      desc: { en: '5 branches · 5 managers', ar: '5 فروع · 5 مديرين' },
-      features: {
-        en: ['Everything in Starter', 'Schedule & events', 'Advanced reports'],
-        ar: ['كل ما في المبتدئ', 'الجدول والفعاليات', 'تقارير متقدمة'],
-      },
-      featured: true,
-    },
-    {
-      name: { en: 'Pro', ar: 'الاحترافي' },
-      price: 399,
-      desc: { en: '15 branches · Unlimited managers', ar: '15 فرعاً · مديرون غير محدودون' },
-      features: {
-        en: ['Everything in Growth', 'Priority support', 'Custom integrations'],
-        ar: ['كل ما في النمو', 'دعم ذو أولوية', 'تكاملات مخصصة'],
-      },
-      featured: false,
-    },
+  tag:            { en: 'Pricing', ar: 'الأسعار' },
+  title:          { en: 'Simple, transparent pricing', ar: 'أسعار بسيطة وشفافة' },
+  sub:            { en: 'Pay only for the branches you use — no tiers, no surprises.', ar: 'ادفع فقط مقابل الفروع التي تستخدمها — بدون خطط معقدة أو مفاجآت.' },
+  perBranch:      { en: '50', ar: '50' },
+  perBranchLabel: { en: 'SAR per branch, per month', ar: 'ريال لكل فرع شهرياً' },
+  trial:          { en: '14-day free trial · No charge until trial ends', ar: '14 يوم تجربة مجانية · لا رسوم حتى انتهاء الفترة' },
+  cta:            { en: 'Start free trial', ar: 'ابدأ تجربتك المجانية' },
+  enterprise:     { en: '10+ branches? Contact us for enterprise pricing.', ar: '10+ فروع؟ تواصل معنا لأسعار المؤسسات.' },
+  examples: [
+    { branches: 1, price: 50 },
+    { branches: 2, price: 100 },
+    { branches: 3, price: 150 },
   ],
 }
 
@@ -394,78 +370,56 @@ export default function Landing() {
         <div style={{ textAlign: 'center', marginBottom: 40 }}>
           <div style={sectionTag}>{t(PRICING.tag)}</div>
           <h2 style={sectionTitle}>{t(PRICING.title)}</h2>
+          <p style={{ ...sectionSub, maxWidth: 420, margin: '8px auto 0' }}>{t(PRICING.sub)}</p>
         </div>
 
         <div style={{
-          display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16,
-          maxWidth: 860, margin: '0 auto',
+          background: '#fff', border: '0.5px solid #E5E7EB', borderRadius: 16,
+          padding: 36, maxWidth: 440, margin: '0 auto', textAlign: 'center',
         }}>
-          {PRICING.plans.map((plan, i) => (
-            <div key={i} style={{
-              background: '#fff',
-              border: plan.featured ? '2px solid #1B4332' : '0.5px solid #E5E7EB',
-              borderRadius: 12, padding: 28, display: 'flex', flexDirection: 'column', gap: 0,
-              position: 'relative',
-            }}>
-              {plan.featured && (
-                <div style={{
-                  position: 'absolute', top: -12,
-                  left: '50%', transform: 'translateX(-50%)',
-                  background: '#1B4332', color: '#fff',
-                  fontSize: 10, fontWeight: 600, padding: '3px 12px', borderRadius: 20,
-                  letterSpacing: '0.3px', whiteSpace: 'nowrap',
-                }}>
-                  {t(PRICING.popular)}
-                </div>
-              )}
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: 6, marginBottom: 6 }}>
+            <span style={{ fontSize: 44, fontWeight: 600, color: '#111827', lineHeight: 1 }}>{t(PRICING.perBranch)}</span>
+            <span style={{ fontSize: 14, color: '#6B7280' }}>SAR</span>
+          </div>
+          <div style={{ fontSize: 14, color: '#6B7280', marginBottom: 28 }}>
+            {t(PRICING.perBranchLabel)}
+          </div>
 
-              <div style={{ fontSize: 15, fontWeight: 600, color: '#111827', marginBottom: 4 }}>
-                {t(plan.name)}
-              </div>
-              <div style={{ fontSize: 13, color: '#6B7280', marginBottom: 20 }}>
-                {t(plan.desc)}
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginBottom: 20 }}>
-                <span style={{ fontSize: 11, color: '#6B7280', marginTop: 4 }}>SAR</span>
-                <span style={{ fontSize: 32, fontWeight: 600, color: '#111827', lineHeight: 1 }}>
-                  {plan.price}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 24 }}>
+            {PRICING.examples.map(ex => (
+              <div key={ex.branches} style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                background: '#F9FAFB', borderRadius: 10, padding: '10px 16px', fontSize: 13,
+              }}>
+                <span style={{ color: '#374151' }}>
+                  {ex.branches} {isAr ? (ex.branches === 1 ? 'فرع' : 'فروع') : (ex.branches === 1 ? 'branch' : 'branches')}
                 </span>
-                <span style={{ fontSize: 13, color: '#9CA3AF' }}>{t(PRICING.mo)}</span>
+                <span style={{ fontWeight: 600, color: '#111827' }}>
+                  {ex.price} {isAr ? 'ر.س/شهر' : 'SAR/mo'}
+                </span>
               </div>
+            ))}
+          </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 24 }}>
-                {(isAr ? plan.features.ar : plan.features.en).map((f, j) => (
-                  <div key={j} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <div style={{
-                      width: 16, height: 16, borderRadius: '50%', background: '#DCFCE7',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                    }}>
-                      <svg width={9} height={9} viewBox="0 0 12 12" fill="none" stroke="#166534" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M2 6l3 3 5-5" />
-                      </svg>
-                    </div>
-                    <span style={{ fontSize: 13, color: '#374151' }}>{f}</span>
-                  </div>
-                ))}
-              </div>
+          <div style={{ fontSize: 12, color: '#6B7280', marginBottom: 20 }}>
+            {t(PRICING.trial)}
+          </div>
 
-              <button
-                onClick={() => navigate('/owner/register')}
-                style={{
-                  marginTop: 'auto',
-                  background: plan.featured ? '#1B4332' : '#fff',
-                  border: plan.featured ? 'none' : '0.5px solid #E5E7EB',
-                  borderRadius: 8, fontSize: 13, fontWeight: 500,
-                  color: plan.featured ? '#fff' : '#374151',
-                  cursor: 'pointer', padding: '10px 0', width: '100%',
-                  fontFamily: 'inherit',
-                }}
-              >
-                {t(PRICING.cta)}
-              </button>
-            </div>
-          ))}
+          <button
+            onClick={() => navigate('/owner/register')}
+            style={{
+              background: '#1B4332', border: 'none', borderRadius: 8,
+              fontSize: 13, fontWeight: 500, color: '#fff',
+              cursor: 'pointer', padding: '11px 0', width: '100%',
+              fontFamily: 'inherit',
+            }}
+          >
+            {t(PRICING.cta)}
+          </button>
+
+          <div style={{ fontSize: 11, color: '#9CA3AF', marginTop: 16 }}>
+            {t(PRICING.enterprise)}
+          </div>
         </div>
       </section>
 

@@ -49,3 +49,21 @@ export function getPlanLimits(settings) {
     pro:     { branches: parseInt(s.pro_branches),     managers: parseInt(s.pro_managers),     price: parseInt(s.price_pro)      },
   }
 }
+
+// Per-branch pricing model — additive, does not replace getPlanLimits().
+// Existing tier-based subscriptions keep working via getPlanLimits() until
+// every consumer is migrated per the pricing migration plan.
+export function getPerBranchPricing(settings = {}) {
+  const pricePerBranch      = parseInt(settings.price_per_branch ?? '50', 10)
+  const managersPerBranch   = parseInt(settings.managers_per_branch ?? '2', 10)
+  const enterpriseThreshold = parseInt(settings.enterprise_branch_threshold ?? '10', 10)
+
+  return {
+    pricePerBranch,
+    managersPerBranch,
+    enterpriseThreshold,
+    calculateMonthlyAmount: (branchCount) => branchCount * pricePerBranch,
+    calculateManagersLimit: (branchCount) => branchCount * managersPerBranch,
+    isEnterprise:           (branchCount) => branchCount >= enterpriseThreshold,
+  }
+}

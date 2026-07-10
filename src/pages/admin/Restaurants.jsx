@@ -4,7 +4,7 @@ import { supabaseAdmin, supabaseTemp } from '../../lib/supabase'
 import { useAdminAuth } from '../../context/AdminAuthContext'
 import { useLanguage } from '../../context/LanguageContext'
 import { useIsMobile } from '../../hooks/useIsMobile'
-import { getPlatformSettings, getPlanLimits } from '../../lib/platformSettings'
+import { getPlatformSettings, getPerBranchPricing } from '../../lib/platformSettings'
 import { getCached, setCached, invalidateCache } from '../../lib/cache'
 import AdminLayout from '../../components/AdminLayout'
 import ErrorBanner from '../../components/ErrorBanner'
@@ -18,6 +18,7 @@ function formatWhatsAppPhone(phone) {
 }
 
 const PLAN_BADGE = {
+  per_branch: { bg:'#EFF6FF', color:'#1D4ED8' },
   starter: { bg:'#EFF6FF', color:'#1D4ED8' },
   growth:  { bg:'#F0FDF4', color:'#166534' },
   pro:     { bg:'#FDF4FF', color:'#7E22CE' },
@@ -64,7 +65,7 @@ export default function AdminRestaurants() {
   const [owners,      setOwners]     = useState([])
   const [totalCount,  setTotalCount] = useState(0)
   const [page,        setPage]       = useState(0)
-  const [planLimits,  setPlanLimits] = useState(getPlanLimits({}))
+  const [pricing,     setPricing]    = useState(getPerBranchPricing({}))
   const [loading,     setLoading]    = useState(true)
   const [error,       setError]      = useState('')
   const [search,        setSearch]       = useState('')
@@ -82,12 +83,12 @@ export default function AdminRestaurants() {
 
   // ── DRAWER STATE ──────────────────────────────────────────
   const [drawerOwner,    setDrawerOwner]    = useState(null)
-  const [actPlan,        setActPlan]        = useState('starter')
+  const [actBranchCount, setActBranchCount] = useState(1)
   const [actDuration,    setActDuration]    = useState(1)
-  const [actAmount,      setActAmount]      = useState(getPlanLimits({}).starter.price)
+  const [actAmount,      setActAmount]      = useState(getPerBranchPricing({}).calculateMonthlyAmount(1))
   const [actNote,        setActNote]        = useState('')
-  const [actBranchesLim, setActBranchesLim] = useState(getPlanLimits({}).starter.branches)
-  const [actManagersLim, setActManagersLim] = useState(getPlanLimits({}).starter.managers)
+  const [actBranchesLim, setActBranchesLim] = useState(1)
+  const [actManagersLim, setActManagersLim] = useState(getPerBranchPricing({}).calculateManagersLimit(1))
   const [actErr,         setActErr]         = useState('')
   const [actSaving,      setActSaving]      = useState(false)
   const [drawerMsg,      setDrawerMsg]      = useState('')
@@ -123,14 +124,14 @@ export default function AdminRestaurants() {
     if (cached) {
       setOwners(cached.owners)
       setTotalCount(cached.totalCount)
-      setPlanLimits(cached.planLimits)
+      setPricing(cached.pricing)
       setLoading(false)
     }
 
     try {
       const settings = await getPlatformSettings(supabaseAdmin)
-      const limits = getPlanLimits(settings)
-      setPlanLimits(limits)
+      const branchPricing = getPerBranchPricing(settings)
+      setPricing(branchPricing)
 
       const { data: ownersData, error: ownersErr, count } = await supabaseAdmin
         .from('users')
@@ -183,7 +184,7 @@ export default function AdminRestaurants() {
       })
 
       setOwners(combined)
-      setCached(cacheKey, { owners: combined, totalCount: count || 0, planLimits: limits }, 60000)
+      setCached(cacheKey, { owners: combined, totalCount: count || 0, pricing: branchPricing }, 60000)
     } catch (err) {
       console.error('Restaurants fetch error:', err)
       setError('Failed to load restaurants.')
@@ -245,14 +246,14 @@ export default function AdminRestaurants() {
   }, [searchParams, owners.length])
 
   function openDrawer(owner) {
-    const currentPlan = (owner.subscription?.plan && owner.subscription.plan !== 'trial') ? owner.subscription.plan : 'starter'
+    const existingBranches = owner.subscription?.branches_limit ?? 1
     setDrawerOwner(owner)
-    setActPlan(currentPlan)
+    setActBranchCount(existingBranches)
     setActDuration(1)
-    setActAmount(planLimits[currentPlan]?.price ?? 0)
+    setActAmount(owner.subscription?.monthly_amount ?? pricing.calculateMonthlyAmount(existingBranches))
     setActNote('')
-    setActBranchesLim(owner.subscription?.branches_limit ?? planLimits[currentPlan].branches)
-    setActManagersLim(owner.subscription?.managers_limit ?? planLimits[currentPlan].managers)
+    setActBranchesLim(existingBranches)
+    setActManagersLim(owner.subscription?.managers_limit ?? pricing.calculateManagersLimit(existingBranches))
     setActErr('')
     setDrawerMsg('')
   }
@@ -263,11 +264,12 @@ export default function AdminRestaurants() {
     setDrawerMsg('')
   }
 
-  function handlePlanChange(plan) {
-    setActPlan(plan)
-    setActAmount(planLimits[plan]?.price ?? 0)
-    setActBranchesLim(planLimits[plan].branches)
-    setActManagersLim(planLimits[plan].managers)
+  function handleBranchCountChange(n) {
+    setActBranchCount(n)
+    if (pricing.isEnterprise(n)) return // enterprise = manual override, no formula
+    setActAmount(pricing.calculateMonthlyAmount(n))
+    setActBranchesLim(n)
+    setActManagersLim(pricing.calculateManagersLimit(n))
   }
 
   async function handleSaveActivation(e) {
@@ -285,10 +287,11 @@ export default function AdminRestaurants() {
         .from('subscriptions')
         .upsert({
           owner_id:       drawerOwner.id,
-          plan:           actPlan,
+          plan:           'per_branch',
           status:         'active',
           branches_limit: Number(actBranchesLim),
           managers_limit: Number(actManagersLim),
+          monthly_amount: Number(actAmount),
           expires_at:     expiresAt,
         }, { onConflict: 'owner_id' })
 
@@ -298,7 +301,7 @@ export default function AdminRestaurants() {
         .from('billing_history')
         .insert({
           owner_id: drawerOwner.id,
-          plan:     actPlan,
+          plan:     'per_branch',
           amount:   Number(actAmount),
           currency: 'SAR',
           status:   'paid',
@@ -308,7 +311,7 @@ export default function AdminRestaurants() {
 
       if (billErr) throw billErr
 
-      await logAction('subscription_activated', `Activated ${actPlan} plan for ${drawerOwner.name}`, drawerOwner.id, 'subscription', { plan: actPlan, amount: Number(actAmount) })
+      await logAction('subscription_activated', `Activated per-branch plan (${actBranchesLim} branches) for ${drawerOwner.name}`, drawerOwner.id, 'subscription', { plan: 'per_branch', branches: Number(actBranchesLim), amount: Number(actAmount) })
 
       invalidateCache(`admin-restaurants-${profile.id}`)
       closeDrawer()
@@ -550,6 +553,7 @@ export default function AdminRestaurants() {
                 </select>
                 <select value={planFilter} onChange={e => { setPlanFilter(e.target.value); setPage(0) }} style={{ fontSize:12, padding:'6px 10px', borderRadius:20, border:'0.5px solid #E5E7EB', outline:'none', fontFamily:'inherit', cursor:'pointer' }}>
                   <option value="all">{isAr ? 'كل الخطط' : 'All Plans'}</option>
+                  <option value="per_branch">{isAr ? 'لكل فرع' : 'Per-Branch'}</option>
                   <option value="starter">Starter</option>
                   <option value="growth">Growth</option>
                   <option value="pro">Pro</option>
@@ -603,6 +607,7 @@ export default function AdminRestaurants() {
                     </select>
                     <select value={planFilter} onChange={e => { setPlanFilter(e.target.value); setPage(0) }} style={{ flex:1, fontSize:12, padding:'8px 10px', borderRadius:20, border:'0.5px solid #E5E7EB', outline:'none', fontFamily:'inherit', cursor:'pointer' }}>
                       <option value="all">{isAr ? 'كل الخطط' : 'All Plans'}</option>
+                      <option value="per_branch">{isAr ? 'لكل فرع' : 'Per-Branch'}</option>
                       <option value="starter">Starter</option>
                       <option value="growth">Growth</option>
                       <option value="pro">Pro</option>
@@ -732,8 +737,10 @@ export default function AdminRestaurants() {
                                 )}
                               </td>
                               <td style={{ padding:'10px 6px' }}>
-                                <span style={{ background: planBadge.bg, color: planBadge.color, fontSize:11, fontWeight:600, padding:'3px 10px', borderRadius:20, textTransform:'capitalize' }}>
-                                  {sub?.plan || 'trial'}
+                                <span style={{ background: planBadge.bg, color: planBadge.color, fontSize:11, fontWeight:600, padding:'3px 10px', borderRadius:20, textTransform: planKey === 'per_branch' ? 'none' : 'capitalize' }}>
+                                  {planKey === 'per_branch'
+                                    ? `${sub?.branches_limit ?? '—'} ${isAr ? 'فروع' : 'branches'}`
+                                    : (sub?.plan || 'trial')}
                                 </span>
                               </td>
                               <td style={{ padding:'10px 6px' }}>
@@ -904,12 +911,36 @@ export default function AdminRestaurants() {
 
             <form onSubmit={handleSaveActivation} noValidate>
               <div style={{ marginBottom:12 }}>
-                <label style={labelStyle}>{isAr ? 'الخطة' : 'Plan'}</label>
-                <select value={actPlan} onChange={e => handlePlanChange(e.target.value)} style={{ ...inputStyle, cursor:'pointer' }}>
-                  <option value="starter">Starter</option>
-                  <option value="growth">Growth</option>
-                  <option value="pro">Pro</option>
-                </select>
+                <label style={labelStyle}>{isAr ? 'عدد الفروع' : 'Branch Count'}</label>
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(5, 1fr)', gap:6, marginBottom:6 }}>
+                  {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => (
+                    <button key={n} type="button" onClick={() => handleBranchCountChange(n)}
+                      style={{
+                        padding:'8px 0', fontSize:13, fontWeight:600,
+                        background: !pricing.isEnterprise(actBranchCount) && actBranchCount === n ? '#1B4332' : '#fff',
+                        color:      !pricing.isEnterprise(actBranchCount) && actBranchCount === n ? '#fff'    : '#111827',
+                        border: !pricing.isEnterprise(actBranchCount) && actBranchCount === n ? '1.5px solid #1B4332' : '0.5px solid #E5E7EB',
+                        borderRadius:8, cursor:'pointer', fontFamily:'inherit',
+                      }}>
+                      {n}
+                    </button>
+                  ))}
+                </div>
+                <button type="button" onClick={() => handleBranchCountChange(10)}
+                  style={{
+                    width:'100%', padding:'8px 0', fontSize:12, fontWeight:600,
+                    background: pricing.isEnterprise(actBranchCount) ? '#1B4332' : '#fff',
+                    color:      pricing.isEnterprise(actBranchCount) ? '#fff'    : '#111827',
+                    border: pricing.isEnterprise(actBranchCount) ? '1.5px solid #1B4332' : '0.5px solid #E5E7EB',
+                    borderRadius:8, cursor:'pointer', fontFamily:'inherit',
+                  }}>
+                  {isAr ? '١٠+ (مؤسسات)' : '10+ (Enterprise)'}
+                </button>
+                {pricing.isEnterprise(actBranchCount) && (
+                  <div style={{ fontSize:11, color:'#92400E', marginTop:6 }}>
+                    {isAr ? 'مؤسسات — عدّل الفروع والمديرين والمبلغ يدوياً أدناه' : 'Enterprise — set branches, managers, and amount manually below'}
+                  </div>
+                )}
               </div>
               <div style={{ marginBottom:12 }}>
                 <label style={labelStyle}>{isAr ? 'المدة' : 'Duration'}</label>

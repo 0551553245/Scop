@@ -5,52 +5,10 @@ import { useOwnerAuth } from '../../context/OwnerAuthContext'
 import { useLanguage } from '../../context/LanguageContext'
 import { useSubscription } from '../../hooks/useSubscription'
 import SubscriptionBanner from '../../components/SubscriptionBanner'
-import { getPlatformSettings, getPlanLimits, DEFAULT_SETTINGS } from '../../lib/platformSettings'
+import { getPlatformSettings, getPerBranchPricing, DEFAULT_SETTINGS } from '../../lib/platformSettings'
 import OwnerLayout from '../../components/OwnerLayout'
 import ErrorBanner from '../../components/ErrorBanner'
 import { useIsMobile } from '../../hooks/useIsMobile'
-
-const PLAN_FEATURES = {
-  trial:   { branches: 1,  managers: 1,  price: 0,   label: 'Free Trial', labelAr: 'تجربة مجانية' },
-  starter: { branches: 1,  managers: 1,  price: 99,  label: 'Starter',    labelAr: 'المبتدئ'      },
-  growth:  { branches: 5,  managers: 5,  price: 199, label: 'Growth',     labelAr: 'النمو'         },
-  pro:     { branches: 15, managers: 99, price: 399, label: 'Pro',        labelAr: 'الاحترافي'    },
-}
-
-const FEATURE_LIST = {
-  trial: [
-    { en: '1 branch',                ar: 'فرع واحد' },
-    { en: '1 manager',                ar: 'مدير واحد' },
-    { en: 'Daily tasks',              ar: 'المهام اليومية' },
-    { en: 'Food safety tracking',     ar: 'تتبع سلامة الغذاء' },
-    { en: 'Basic reports',            ar: 'تقارير أساسية' },
-  ],
-  starter: [
-    { en: '1 branch',                ar: 'فرع واحد' },
-    { en: '1 manager',                ar: 'مدير واحد' },
-    { en: 'Daily tasks',              ar: 'المهام اليومية' },
-    { en: 'Food safety tracking',     ar: 'تتبع سلامة الغذاء' },
-    { en: 'Basic reports',            ar: 'تقارير أساسية' },
-  ],
-  growth: [
-    { en: '5 branches',               ar: '5 فروع' },
-    { en: '5 managers',                ar: '5 مديرين' },
-    { en: 'Daily tasks',              ar: 'المهام اليومية' },
-    { en: 'Food safety tracking',     ar: 'تتبع سلامة الغذاء' },
-    { en: 'Advanced reports',         ar: 'تقارير متقدمة' },
-    { en: 'Real-time dashboard',      ar: 'لوحة تحكم لحظية' },
-  ],
-  pro: [
-    { en: '15 branches',              ar: '15 فرعاً' },
-    { en: 'Unlimited managers',       ar: 'مديرون غير محدودين' },
-    { en: 'Daily tasks',              ar: 'المهام اليومية' },
-    { en: 'Food safety tracking',     ar: 'تتبع سلامة الغذاء' },
-    { en: 'Advanced reports',         ar: 'تقارير متقدمة' },
-    { en: 'Real-time dashboard',      ar: 'لوحة تحكم لحظية' },
-    { en: 'WhatsApp support',         ar: 'دعم واتساب' },
-    { en: 'Dedicated account manager', ar: 'مدير حساب مخصص' },
-  ],
-}
 
 const STATUS_BADGE = {
   active:  { bg:'#F0FDF4', color:'#166534', en:'● Active',  ar:'● نشط'  },
@@ -70,8 +28,6 @@ function billingStatusStyle(status) {
   return { bg:'#FFFBEB', color:'#92400E' }
 }
 
-const PLAN_RANK = { trial:0, starter:1, growth:2, pro:3 }
-
 export default function OwnerSubscription() {
   const { profile }  = useOwnerAuth()
   const { lang, isAr } = useLanguage()
@@ -81,10 +37,15 @@ export default function OwnerSubscription() {
   const [branchCount,    setBranchCount]    = useState(0)
   const [managerCount,   setManagerCount]   = useState(0)
   const [billing,        setBilling]        = useState([])
-  const [planLimits,     setPlanLimits]     = useState(getPlanLimits({}))
+  const [pricing,        setPricing]        = useState(getPerBranchPricing({}))
   const [whatsappNumber, setWhatsappNumber] = useState(DEFAULT_SETTINGS.support_whatsapp)
   const [loadingExtra,   setLoadingExtra]   = useState(true)
   const [error,          setError]          = useState('')
+
+  // ── Upgrade-branches UI ──
+  const [showUpgrade,   setShowUpgrade]   = useState(false)
+  const [upgradeCount,  setUpgradeCount]  = useState(1)
+  const [upgradeNotice, setUpgradeNotice] = useState('')
 
   const fetchExtra = useCallback(async () => {
     if (!profile) return
@@ -96,7 +57,7 @@ export default function OwnerSubscription() {
       setBranchCount(cached.branchCount)
       setManagerCount(cached.managerCount)
       setBilling(cached.billing)
-      setPlanLimits(cached.planLimits)
+      setPricing(cached.pricing)
       setWhatsappNumber(cached.whatsappNumber)
       setLoadingExtra(false)
     }
@@ -111,9 +72,9 @@ export default function OwnerSubscription() {
       if (branchRes.error)  throw branchRes.error
       if (billingRes.error) throw billingRes.error
 
-      const branchIds = (branchRes.data || []).map(b => b.id)
-      const limits    = getPlanLimits(settings)
-      const waNum     = settings.support_whatsapp || null
+      const branchIds     = (branchRes.data || []).map(b => b.id)
+      const branchPricing = getPerBranchPricing(settings)
+      const waNum         = settings.support_whatsapp || null
 
       // Round 2: manager count (needs branchIds from round 1)
       let mgrCount = 0
@@ -129,13 +90,13 @@ export default function OwnerSubscription() {
       setBranchCount(branchIds.length)
       setManagerCount(mgrCount)
       setBilling(billingRes.data || [])
-      setPlanLimits(limits)
+      setPricing(branchPricing)
       setWhatsappNumber(waNum)
       setCached(cacheKey, {
         branchCount: branchIds.length,
         managerCount: mgrCount,
         billing: billingRes.data || [],
-        planLimits: limits,
+        pricing: branchPricing,
         whatsappNumber: waNum,
       }, 120000)
     } catch (err) {
@@ -161,19 +122,22 @@ export default function OwnerSubscription() {
     </OwnerLayout>
   )
 
-  const planFeature = subscription ? PLAN_FEATURES[subscription.plan] || PLAN_FEATURES.starter : null
-  const livePlan    = subscription ? planLimits[subscription.plan]  || planLimits.starter    : null
-  const plan        = planFeature && livePlan ? { ...planFeature, price: livePlan.price, branches: livePlan.branches, managers: livePlan.managers } : planFeature
   const status   = subscription?.status || 'trial'
   const badge    = STATUS_BADGE[status] || STATUS_BADGE.trial
+
+  // Read straight off the subscription row (monthly_amount is set at
+  // signup/upgrade time). Legacy rows created before per-branch pricing
+  // have monthly_amount = null, so fall back to a live per-branch calc —
+  // this way the display never needs to know about 'starter'/'growth'/'pro'.
+  const subBranchesLimit = subscription?.branches_limit ?? 0
+  const subManagersLimit = subscription?.managers_limit ?? 0
+  const subMonthlyAmount = subscription?.monthly_amount ?? pricing.calculateMonthlyAmount(subBranchesLimit)
 
   const renewalText = !subscription ? '' : isExpired
     ? (isAr ? `انتهى في ${formatDate(subscription.expires_at, lang)}` : `Expired on ${formatDate(subscription.expires_at, lang)}`)
     : isTrial
       ? (isAr ? `تنتهي التجربة في ${formatDate(subscription.trial_ends_at || subscription.expires_at, lang)} · ${daysLeft} يوم متبقي` : `Trial ends on ${formatDate(subscription.trial_ends_at || subscription.expires_at, lang)} · ${daysLeft} days left`)
       : (isAr ? `يتجدد في ${formatDate(subscription.expires_at, lang)} · ${daysLeft} يوم متبقي` : `Renews on ${formatDate(subscription.expires_at, lang)} · ${daysLeft} days left`)
-
-  const curRank = PLAN_RANK[subscription?.plan ?? 'trial'] ?? 0
 
   return (
     <OwnerLayout activePath="/owner/subscription" title="Subscription" titleAr="الاشتراك">
@@ -203,13 +167,17 @@ export default function OwnerSubscription() {
             <div style={{ background:'#1B4332', borderRadius:20, padding: isMobile ? 20 : 28, color:'#fff', marginBottom:20 }}>
               <div style={{ display:'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent:'space-between', alignItems: isMobile ? 'stretch' : 'flex-start', gap:20 }}>
 
-                {/* Left — plan identity */}
+                {/* Left — subscription identity */}
                 <div style={{ flex:1 }}>
                   <div style={{ fontSize:11, fontWeight:600, color:'rgba(255,255,255,0.5)', textTransform:'uppercase', letterSpacing:'1px', marginBottom:10 }}>
-                    {isAr ? 'خطتك الحالية' : 'Current Plan'}
+                    {isAr ? 'اشتراكك الحالي' : 'Current Subscription'}
                   </div>
                   <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:10, flexWrap:'wrap' }}>
-                    <span style={{ fontSize:22, fontWeight:700 }}>{isAr ? plan?.labelAr : plan?.label}</span>
+                    <span style={{ fontSize:20, fontWeight:700 }}>
+                      {isAr
+                        ? `${subBranchesLimit} فروع · ${subManagersLimit} مديرين · ${subMonthlyAmount} ريال/شهر`
+                        : `${subBranchesLimit} branches · ${subManagersLimit} managers · ${subMonthlyAmount} SAR/month`}
+                    </span>
                     <span style={{ fontSize:11, fontWeight:700, padding:'3px 10px', borderRadius:20, background:badge.bg, color:badge.color }}>
                       {isAr ? badge.ar : badge.en}
                     </span>
@@ -234,91 +202,89 @@ export default function OwnerSubscription() {
               </div>
             </div>
 
-            {/* ── SECTION LABEL ── */}
-            <div style={{ fontSize:12, fontWeight:700, color:'#9CA3AF', textTransform:'uppercase', letterSpacing:'1px', marginBottom:14 }}>
-              {isAr ? 'اختر خطة' : 'Choose a plan'}
-            </div>
+            {/* ── UPGRADE BRANCHES ── */}
+            <div style={{ background:'#fff', border:'1.5px solid #E5E7EB', borderRadius:18, padding:22, marginBottom:20 }}>
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom: showUpgrade ? 16 : 0, flexWrap:'wrap', gap:10 }}>
+                <div style={{ fontSize:13, fontWeight:700, color:'#111827' }}>
+                  {isAr ? 'ترقية عدد الفروع' : 'Upgrade branches'}
+                </div>
+                <button
+                  onClick={() => { setUpgradeNotice(''); setUpgradeCount(subBranchesLimit || 1); setShowUpgrade(p => !p) }}
+                  style={{ padding:'8px 16px', background: showUpgrade ? '#fff' : '#1B4332', color: showUpgrade ? '#6B7280' : '#fff', border: showUpgrade ? '1.5px solid #E5E7EB' : 'none', borderRadius:10, fontSize:12, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}
+                >
+                  {showUpgrade ? (isAr ? 'إغلاق' : 'Close') : (isAr ? 'ترقية الفروع' : 'Upgrade branches')}
+                </button>
+              </div>
 
-            {/* ── PLAN CARDS ── */}
-            <div style={{ display:'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3,1fr)', gap:14, marginBottom:20 }}>
-              {[
-                {
-                  key: 'starter',
-                  icon: (
-                    <div style={{ width:40, height:40, background:'#F0FDF4', borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', marginBottom:16 }}>
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                        <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" stroke="#1B4332" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        <path d="M9 22V12h6v10" stroke="#1B4332" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
-                    </div>
-                  ),
-                },
-                {
-                  key: 'growth',
-                  icon: (
-                    <div style={{ width:40, height:40, background:'#EFF6FF', borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', marginBottom:16 }}>
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                        <path d="M18 20V10M12 20V4M6 20v-6" stroke="#378ADD" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
-                    </div>
-                  ),
-                },
-                {
-                  key: 'pro',
-                  icon: (
-                    <div style={{ width:40, height:40, background:'#F5F3FF', borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', marginBottom:16 }}>
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                        <path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 00-2.91-.09z" stroke="#7C3AED" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        <path d="M12 15l-3-3a22 22 0 002-3.95A12.88 12.88 0 0122 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 01-4 2z" stroke="#7C3AED" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        <path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5" stroke="#7C3AED" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
-                    </div>
-                  ),
-                },
-              ].map(({ key, icon }) => {
-                const pf       = PLAN_FEATURES[key]
-                const pl       = planLimits[key] || {}
-                const cardRank = PLAN_RANK[key] ?? 1
-                const isCurr   = subscription.plan === key
-                const isBelow  = curRank > cardRank
-                const cardPrice = pl.price === 0
-                  ? (isAr ? 'مجاني' : 'Free')
-                  : isAr ? `${pl.price} ريال/شهر` : `${pl.price} SAR/mo`
-                const featList = FEATURE_LIST[key] || []
+              {showUpgrade && (() => {
+                const isUpgradeEnterprise = pricing.isEnterprise(upgradeCount)
+                const newMonthly          = pricing.calculateMonthlyAmount(upgradeCount)
+                const whatsappLink        = 'https://wa.me/966551553245'
                 return (
-                  <div key={key} style={{ background:'#fff', border: isCurr ? '2px solid #1B4332' : '1.5px solid #E5E7EB', borderRadius:18, padding:22, position:'relative', display:'flex', flexDirection:'column' }}>
-                    {isCurr && (
-                      <div style={{ position:'absolute', top:-12, [isAr ? 'right' : 'left']: 18, background:'#1B4332', color:'#fff', fontSize:10, fontWeight:700, padding:'3px 12px', borderRadius:20 }}>
-                        {isAr ? 'خطتك' : 'Your plan'}
-                      </div>
-                    )}
-                    {icon}
-                    <div style={{ fontSize:15, fontWeight:700, color:'#111827', marginBottom:4 }}>{isAr ? pf.labelAr : pf.label}</div>
-                    <div style={{ fontSize:20, fontWeight:800, color:'#111827', marginBottom:16 }}>{cardPrice}</div>
-                    <div style={{ flex:1, marginBottom:20 }}>
-                      {featList.map((f, i) => (
-                        <div key={i} style={{ display:'flex', alignItems:'center', gap:8, fontSize:12, color:'#374151', marginBottom:8 }}>
-                          <span style={{ color:'#1B4332', fontWeight:700, fontSize:13 }}>✓</span>
-                          {isAr ? f.ar : f.en}
-                        </div>
+                  <div>
+                    <div style={{ display:'grid', gridTemplateColumns:'repeat(5, 1fr)', gap:8, marginBottom:8 }}>
+                      {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => (
+                        <button key={n} type="button" onClick={() => setUpgradeCount(n)}
+                          style={{
+                            padding:'10px 0', fontSize:14, fontWeight:600,
+                            background: !isUpgradeEnterprise && upgradeCount === n ? '#1B4332' : '#F9FAFB',
+                            color:      !isUpgradeEnterprise && upgradeCount === n ? '#fff'    : '#111827',
+                            border: !isUpgradeEnterprise && upgradeCount === n ? '1.5px solid #1B4332' : '0.5px solid #E5E7EB',
+                            borderRadius:10, cursor:'pointer', fontFamily:'inherit',
+                          }}>
+                          {n}
+                        </button>
                       ))}
                     </div>
-                    {isCurr ? (
-                      <button disabled style={{ width:'100%', padding:'10px', background:'#F0FDF4', color:'#166534', border:'1.5px solid #BBF7D0', borderRadius:10, fontSize:13, fontWeight:600, cursor:'default', fontFamily:'inherit' }}>
-                        {isAr ? 'خطتك الحالية' : 'Your plan'}
-                      </button>
-                    ) : isBelow ? (
-                      <button onClick={() => alert(isAr ? 'التخفيض للخطة الأدنى قريباً' : 'Downgrade coming soon')} style={{ width:'100%', padding:'10px', background:'#fff', color:'#6B7280', border:'1.5px solid #E5E7EB', borderRadius:10, fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>
-                        {isAr ? `الرجوع إلى ${pf.labelAr}` : `Downgrade to ${pf.label}`}
-                      </button>
+                    <button type="button" onClick={() => setUpgradeCount(10)}
+                      style={{
+                        width:'100%', padding:'10px 16px', marginBottom:14,
+                        background: isUpgradeEnterprise ? '#1B4332' : '#F9FAFB',
+                        color:      isUpgradeEnterprise ? '#fff'    : '#111827',
+                        border: isUpgradeEnterprise ? '1.5px solid #1B4332' : '0.5px solid #E5E7EB',
+                        borderRadius:10, fontSize:12, fontWeight:600, cursor:'pointer', fontFamily:'inherit',
+                      }}>
+                      {isAr ? '١٠+ فروع (مؤسسات)' : '10+ branches (Enterprise)'}
+                    </button>
+
+                    {!isUpgradeEnterprise ? (
+                      <>
+                        <div style={{ textAlign:'center', fontSize:13, color:'#374151', marginBottom:14 }}>
+                          {isAr
+                            ? `${upgradeCount} فروع × ${pricing.pricePerBranch} ر.س = `
+                            : `${upgradeCount} branches × ${pricing.pricePerBranch} SAR = `}
+                          <strong style={{ color:'#1B4332' }}>{newMonthly} {isAr ? 'ر.س/شهر' : 'SAR/mo'}</strong>
+                        </div>
+                        <button
+                          disabled={upgradeCount === subBranchesLimit}
+                          onClick={() => setUpgradeNotice(isAr
+                            ? 'تم استلام طلبك — الدفع عبر موياسر قريباً. سنتواصل معك لإتمام الترقية.'
+                            : 'Request received — Moyasar payment coming soon. We will contact you to complete the upgrade.')}
+                          style={{ width:'100%', padding:'10px', background: upgradeCount === subBranchesLimit ? '#9CA3AF' : '#1B4332', color:'#fff', border:'none', borderRadius:10, fontSize:13, fontWeight:600, cursor: upgradeCount === subBranchesLimit ? 'not-allowed' : 'pointer', fontFamily:'inherit' }}
+                        >
+                          {isAr ? 'طلب الترقية' : 'Request upgrade'}
+                        </button>
+                      </>
                     ) : (
-                      <button onClick={() => alert(isAr ? 'الدفع عبر موياسر قريباً' : 'Moyasar payment coming soon')} style={{ width:'100%', padding:'10px', background:'#1B4332', color:'#fff', border:'none', borderRadius:10, fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>
-                        {isAr ? `الترقية إلى ${pf.labelAr} ←` : `Upgrade to ${pf.label} →`}
-                      </button>
+                      <div style={{ textAlign:'center' }}>
+                        <div style={{ fontSize:13, fontWeight:600, color:'#92400E', marginBottom:10 }}>
+                          {isAr ? 'تواصل معنا لأسعار المؤسسات' : 'Contact us for enterprise pricing'}
+                        </div>
+                        <a href={whatsappLink} target="_blank" rel="noopener noreferrer"
+                          style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'9px 16px', background:'#25D366', color:'#fff', borderRadius:10, fontSize:12, fontWeight:600, textDecoration:'none' }}>
+                          {isAr ? 'واتساب: 966551553245+' : 'WhatsApp: +966551553245'}
+                        </a>
+                      </div>
+                    )}
+
+                    {upgradeNotice && (
+                      <div style={{ marginTop:12, textAlign:'center', fontSize:12, color:'#166534', background:'#F0FDF4', border:'0.5px solid #BBF7D0', borderRadius:10, padding:'10px 12px' }}>
+                        {upgradeNotice}
+                      </div>
                     )}
                   </div>
                 )
-              })}
+              })()}
             </div>
 
             {/* ── BOTTOM GRID ── */}
