@@ -17,15 +17,18 @@ export default function EmailVerify() {
 
       const userId = session.user.id
       const email  = session.user.email
+      const meta   = session.user.user_metadata || {}
 
+      // localStorage does not survive if the verification link is opened in
+      // a different browser/device than registration — pending may be null
+      // here even on a legitimate first-time verification. Do NOT bail out
+      // in that case; user_metadata (branch_count, name) travels with the
+      // Supabase session itself and is still usable.
       const raw = localStorage.getItem('scop-pending-registration')
-      if (!raw) {
-        setStatus('success')
-        return
+      let pending = null
+      if (raw) {
+        try { pending = JSON.parse(raw) } catch { pending = null }
       }
-
-      let pending
-      try { pending = JSON.parse(raw) } catch { setStatus('success'); return }
 
       setStatus('completing')
 
@@ -33,34 +36,44 @@ export default function EmailVerify() {
         const { error: userErr } = await supabaseOwner.from('users').upsert({
           id:        userId,
           email:     email,
-          name:      pending.ownerName,
-          name_ar:   pending.nameAr || null,
-          phone:     pending.phone,
+          name:      pending?.ownerName || meta.name || email,
+          name_ar:   pending?.nameAr || null,
+          phone:     pending?.phone || null,
           role:      'owner',
           is_active: true,
         }, { onConflict: 'id' })
         if (userErr) throw userErr
 
-        const { data: existingBranch } = await supabaseOwner
-          .from('branches').select('id')
-          .eq('owner_id', userId).eq('name', pending.restaurantName).maybeSingle()
+        // Restaurant name/city only ever existed in localStorage — if pending
+        // is unavailable (cross-browser case), branch creation is skipped
+        // and the owner adds their first branch from the dashboard instead.
+        if (pending?.restaurantName) {
+          const { data: existingBranch } = await supabaseOwner
+            .from('branches').select('id')
+            .eq('owner_id', userId).eq('name', pending.restaurantName).maybeSingle()
 
-        if (!existingBranch) {
-          const { error: branchErr } = await supabaseOwner.from('branches').insert({
-            name:      pending.restaurantName,
-            name_ar:   pending.restaurantNameAr || pending.restaurantName,
-            city:      pending.city,
-            owner_id:  userId,
-            is_active: true,
-          })
-          if (branchErr) throw branchErr
+          if (!existingBranch) {
+            const { error: branchErr } = await supabaseOwner.from('branches').insert({
+              name:      pending.restaurantName,
+              name_ar:   pending.restaurantNameAr || pending.restaurantName,
+              city:      pending.city,
+              owner_id:  userId,
+              is_active: true,
+            })
+            if (branchErr) throw branchErr
+          }
         }
 
         const { data: existingSub } = await supabaseOwner
           .from('subscriptions').select('id').eq('owner_id', userId).maybeSingle()
 
         if (!existingSub) {
-          const branchCount = pending.branch_count || 1
+          // branch_count is read from user_metadata first — it survives
+          // cross-browser verification because it travels with the Supabase
+          // session, not localStorage. pending.branch_count is kept only as
+          // a fallback for verification links already in flight before this
+          // fix shipped.
+          const branchCount = Number(meta.branch_count ?? pending?.branch_count ?? 1)
           const trialExpiry = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()
 
           const settings = await getPlatformSettings(supabaseOwner)
@@ -80,7 +93,7 @@ export default function EmailVerify() {
           if (subErr) throw subErr
         }
 
-        localStorage.removeItem('scop-pending-registration')
+        if (pending) localStorage.removeItem('scop-pending-registration')
         setStatus('success')
       } catch (err) {
         console.error('Email verify setup error:', err)

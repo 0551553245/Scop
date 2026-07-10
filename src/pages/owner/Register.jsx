@@ -242,7 +242,7 @@ export default function OwnerRegister() {
         email: form.email,
         password: form.password,
         options: {
-          data:            { name: form.ownerName },
+          data:            { name: form.ownerName, branch_count: branchCount },
           emailRedirectTo: 'https://scopsa.com/verify',
         },
       })

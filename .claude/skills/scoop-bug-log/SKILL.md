@@ -2031,4 +2031,17 @@ const pct       = calcRate(bDone, bExpected)
 
 ---
 
-## Bug count: #038 – #164 (127 bugs total)
+---
+
+## BUG #165 — CRITICAL: branch_count lost when verification email opened in a different browser — subscription silently created with branches_limit=1
+**Files:** src/pages/owner/Register.jsx, src/pages/owner/EmailVerify.jsx
+**Symptom:** Owner selects 6 branches during registration, but their subscription ends up with a lower/wrong `branches_limit` (or the account behaves as if it has no subscription until dashboard load) with no error shown anywhere.
+**Root cause:** `Register.jsx` stored `branch_count` only in `localStorage['scop-pending-registration']`. `localStorage` is scoped per browser/origin — it does NOT travel with the verification email link, which is very commonly opened in a different browser or device than the one used to register (e.g. registered in desktop Chrome, clicked the link from a phone's Gmail app). When `EmailVerify.jsx`'s `completeSetup()` found `localStorage.getItem('scop-pending-registration')` returned `null` in that case, it hit `if (!raw) { setStatus('success'); return }` and bailed out **immediately — creating no `users` row, no `branches` row, and no `subscriptions` row at all**, despite showing "Email verified!" to the owner. The subscription only ever got created later, whenever the owner first loaded `/owner/dashboard`, via `useSubscription.js`'s recovery-insert path — which has zero knowledge of what branch count was chosen and silently defaults to `branches_limit: 1`.
+**Fix:**
+1. `Register.jsx`: `branch_count` is now also passed into `supabaseTemp.auth.signUp()`'s `options.data` (Supabase `user_metadata`), alongside the existing `name` field — `data: { name: form.ownerName, branch_count: branchCount }`. `user_metadata` travels with the authenticated session itself, not `localStorage`, so it survives cross-browser verification.
+2. `EmailVerify.jsx`: `completeSetup()` no longer bails out when `localStorage` is empty. `pending` is now allowed to be `null`, and the function proceeds regardless: the `users` upsert falls back to `session.user.user_metadata?.name` (then `email`) when `pending.ownerName` is unavailable; the `branches` insert is skipped entirely when `pending.restaurantName` is unavailable (restaurant name/city were never moved to `user_metadata` — out of this fix's scope — so branch creation genuinely cannot happen cross-browser and the owner adds their first branch from the dashboard's empty state instead); the subscription insert now reads `branchCount` as `Number(session.user.user_metadata?.branch_count ?? pending?.branch_count ?? 1)` — metadata first, `pending` only as a fallback for links already in flight before this fix, `1` as the final fallback.
+**Rule:** Any registration data a later step depends on MUST be verified to survive every path that step can actually be reached by — not just the happy path where the same browser is used throughout. `localStorage` never survives a cross-device/cross-browser email link click; if a value must survive that boundary, it belongs in Supabase `user_metadata` (attached to `options.data` in `signUp()`), not `localStorage`. Also: never let a "missing optional context" branch (`if (!raw) return`) silently skip *all* downstream work, including work that doesn't actually depend on the missing data (here: subscription creation only needed `branch_count`, which was fixable independently of the restaurant-name problem it was bundled with).
+
+---
+
+## Bug count: #038 – #165 (128 bugs total)
