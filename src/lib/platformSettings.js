@@ -25,14 +25,14 @@ export function invalidateSettingsCache() {
 }
 
 export const DEFAULT_SETTINGS = {
-  trial_duration_days:  '14',
-  support_whatsapp:     null,
+  trial_duration_days: '14',
+  support_whatsapp: null,
 }
 
-// Per-branch pricing model.
+/** Per-branch pricing — never hardcode limits/prices in components. */
 export function getPerBranchPricing(settings = {}) {
-  const pricePerBranch      = parseInt(settings.price_per_branch ?? '50', 10)
-  const managersPerBranch   = parseInt(settings.managers_per_branch ?? '2', 10)
+  const pricePerBranch = parseInt(settings.price_per_branch ?? '50', 10)
+  const managersPerBranch = parseInt(settings.managers_per_branch ?? '2', 10)
   const enterpriseThreshold = parseInt(settings.enterprise_branch_threshold ?? '10', 10)
 
   return {
@@ -41,6 +41,6 @@ export function getPerBranchPricing(settings = {}) {
     enterpriseThreshold,
     calculateMonthlyAmount: (branchCount) => branchCount * pricePerBranch,
     calculateManagersLimit: (branchCount) => branchCount * managersPerBranch,
-    isEnterprise:           (branchCount) => branchCount >= enterpriseThreshold,
+    isEnterprise: (branchCount) => branchCount >= enterpriseThreshold,
   }
 }

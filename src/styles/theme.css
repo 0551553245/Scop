@@ -1,90 +1,55 @@
-/* ============================================================
-   SCOP — Design System Tokens
-   Match exactly to approved HTML mockups
-   ============================================================ */
+/* Scop design system — flat, border-only, Inter + Cairo */
 
 :root {
+  --bg-page: #EEF2EE;
+  --color-background-primary: #FFFFFF;
+  --color-background-secondary: #F9FAFB;
+  --color-background-tertiary: #F3F4F6;
 
-  /* ── BACKGROUNDS ─────────────────────────────────────── */
-  --bg-page:                  #F7F5F0;   /* warm off-white page background */
-  --color-background-primary:   #FFFFFF;   /* cards, sidebar, topbar */
-  --color-background-secondary: #F9FAFB;   /* input bg, hover states */
-  --color-background-tertiary:  #F3F4F6;   /* outer wrapper bg */
+  --color-green: #1B4332;
+  --color-green-hover: #142D22;
+  --color-green-bg: #F0FDF4;
+  --color-green-border: #BBF7D0;
+  --color-green-text: #166534;
 
-  /* ── GREEN (primary brand) ───────────────────────────── */
-  --color-green:              #1B4332;   /* primary green — buttons, active states */
-  --color-green-hover:        #142D22;   /* darker on hover */
-  --color-green-bg:           #F0FDF4;   /* light green bg — active nav, badges */
-  --color-green-border:       #BBF7D0;   /* green card borders */
-  --color-green-text:         #166534;   /* green text on light bg */
+  --color-amber: #F59E0B;
+  --color-amber-bg: #FFFBEB;
+  --color-amber-border: #FDE68A;
+  --color-amber-text: #92400E;
 
-  /* ── AMBER (warnings, pending) ───────────────────────── */
-  --color-amber:              #F59E0B;   /* amber icon/text */
-  --color-amber-bg:           #FFFBEB;   /* amber light bg */
-  --color-amber-border:       #FDE68A;   /* amber border */
-  --color-amber-text:         #92400E;   /* amber dark text */
+  --color-red: #E24B4A;
+  --color-red-bg: #FFF1F2;
+  --color-red-border: #FECACA;
+  --color-red-text: #9F1239;
 
-  /* ── RED (errors, failed) ────────────────────────────── */
-  --color-red:                #E24B4A;   /* red icon/text */
-  --color-red-bg:             #FFF1F2;   /* red light bg */
-  --color-red-border:         #FECACA;   /* red border */
-  --color-red-text:           #9F1239;   /* red dark text */
+  --color-blue: #378ADD;
+  --color-blue-bg: #EFF6FF;
+  --color-blue-text: #1E40AF;
 
-  /* ── BLUE (info, temperature) ────────────────────────── */
-  --color-blue-bg:            #EFF6FF;   /* blue light bg */
-  --color-blue-text:          #1E40AF;   /* blue text */
+  --color-border-primary: #E5E7EB;
+  --color-border-secondary: #D1D5DB;
 
-  /* ── BORDERS ─────────────────────────────────────────── */
-  --color-border-primary:     #E5E7EB;   /* main borders */
-  --color-border-secondary:   #D1D5DB;   /* stronger borders */
-  --color-border-tertiary:    #E5E7EB;   /* card borders (alias) */
+  --color-text-primary: #111827;
+  --color-text-secondary: #6B7280;
+  --color-text-tertiary: #9CA3AF;
 
-  /* ── TEXT ────────────────────────────────────────────── */
-  --color-text-primary:       #111827;   /* headings, main content */
-  --color-text-secondary:     #6B7280;   /* supporting text */
-  --color-text-tertiary:      #9CA3AF;   /* muted / timestamps */
+  --sidebar-width: 220px;
+  --topbar-height: 52px;
 
-  /* ── LAYOUT ──────────────────────────────────────────── */
-  --sidebar-width:            200px;     /* approved sidebar width */
-  --topbar-height:            52px;      /* approved topbar height */
+  --radius-card: 16px;
+  --radius-button: 10px;
+  --radius-badge: 20px;
 
-  /* ── RADIUS ──────────────────────────────────────────── */
-  --border-radius-sm:         6px;
-  --border-radius-md:         8px;
-  --border-radius-lg:         12px;
-  --border-radius-xl:         16px;
-  --radius-card:              12px;      /* card border radius */
-  --radius-button:            8px;       /* button border radius */
-  --radius-badge:             20px;      /* pill badges */
+  --font-sans-en: 'Inter', 'Segoe UI', sans-serif;
+  --font-sans-ar: 'Cairo', 'Segoe UI', sans-serif;
+  --font-sans: 'Inter', 'Cairo', 'Segoe UI', sans-serif;
 
-  /* ── TYPOGRAPHY ──────────────────────────────────────── */
-  --font-sans-en:             'Inter', 'Segoe UI', sans-serif;
-  --font-sans-ar:             'Cairo', 'Segoe UI', sans-serif;
-  --font-sans:                'Inter', 'Cairo', 'Segoe UI', sans-serif;
-
-  /* ── SHADOWS ─────────────────────────────────────────── */
-  /* Cards use border only — NO shadows (per approved design) */
-  --shadow-card:              none;
-  --shadow-dropdown:          0 4px 16px rgba(0, 0, 0, 0.08);
-  --shadow-modal:             0 8px 32px rgba(0, 0, 0, 0.12);
-
-  /* ── STATUS COLORS (task/food safety badges) ─────────── */
-  --status-done-bg:           #F0FDF4;
-  --status-done-text:         #166534;
-  --status-done-border:       #BBF7D0;
-
-  --status-pending-bg:        #FFFBEB;
-  --status-pending-text:      #92400E;
-  --status-pending-border:    #FDE68A;
-
-  --status-failed-bg:         #FFF1F2;
-  --status-failed-text:       #9F1239;
-  --status-failed-border:     #FECACA;
-
-  --status-live-color:        #4ADE80;   /* live dot green */
+  --status-done: #2D7A4F;
+  --status-pending: #F5A623;
+  --status-missed: #E24B4A;
+  --status-scheduled: #378ADD;
 }
 
-/* ── BASE RESET ───────────────────────────────────────────── */
 *, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
@@ -94,7 +59,6 @@
 html {
   font-size: 14px;
   -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
 }
 
 body {
@@ -104,48 +68,15 @@ body {
   line-height: 1.5;
 }
 
-/* ── RTL SUPPORT ──────────────────────────────────────────── */
-[dir="rtl"] {
-  font-family: var(--font-sans-ar);
-}
+[dir="rtl"] { font-family: var(--font-sans-ar); }
+[dir="ltr"] { font-family: var(--font-sans-en); }
 
-[dir="ltr"] {
-  font-family: var(--font-sans-en);
-}
-
-/* ── SCROLLBAR ────────────────────────────────────────────── */
-::-webkit-scrollbar {
-  width: 4px;
-  height: 4px;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
+::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-thumb {
   background: var(--color-border-secondary);
   border-radius: 20px;
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: var(--color-text-tertiary);
-}
-
-/* ── UTILITY: visually hidden (screen readers only) ──────── */
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
-
-/* ── ANIMATIONS ───────────────────────────────────────────── */
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
@@ -155,10 +86,5 @@ body {
   to   { opacity: 1; transform: translateY(0); }
 }
 
-.animate-spin {
-  animation: spin 0.8s linear infinite;
-}
-
-.animate-fadeIn {
-  animation: fadeIn 0.2s ease-out;
-}
+.animate-spin { animation: spin 0.8s linear infinite; }
+.animate-fadeIn { animation: fadeIn 0.2s ease-out; }

@@ -37,26 +37,28 @@ export default function EmailVerify() {
           id:        userId,
           email:     email,
           name:      pending?.ownerName || meta.name || email,
-          name_ar:   pending?.nameAr || null,
-          phone:     pending?.phone || null,
+          name_ar:   pending?.nameAr || meta.name_ar || null,
+          phone:     pending?.phone || meta.phone || null,
           role:      'owner',
           is_active: true,
         }, { onConflict: 'id' })
         if (userErr) throw userErr
 
-        // Restaurant name/city only ever existed in localStorage — if pending
-        // is unavailable (cross-browser case), branch creation is skipped
-        // and the owner adds their first branch from the dashboard instead.
-        if (pending?.restaurantName) {
+        // Prefer user_metadata (survives cross-browser verify); fall back to localStorage pending.
+        const restaurantName = pending?.restaurantName || meta.restaurant_name || null
+        const restaurantNameAr = pending?.restaurantNameAr || meta.restaurant_name_ar || restaurantName
+        const city = pending?.city || meta.city || null
+
+        if (restaurantName) {
           const { data: existingBranch } = await supabaseOwner
             .from('branches').select('id')
-            .eq('owner_id', userId).eq('name', pending.restaurantName).maybeSingle()
+            .eq('owner_id', userId).eq('name', restaurantName).maybeSingle()
 
           if (!existingBranch) {
             const { error: branchErr } = await supabaseOwner.from('branches').insert({
-              name:      pending.restaurantName,
-              name_ar:   pending.restaurantNameAr || pending.restaurantName,
-              city:      pending.city,
+              name:      restaurantName,
+              name_ar:   restaurantNameAr,
+              city:      city,
               owner_id:  userId,
               is_active: true,
             })

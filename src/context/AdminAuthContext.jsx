@@ -7,13 +7,11 @@ let _adminCache = null
 let _adminCacheUserId = null
 
 export function AdminAuthProvider({ children }) {
-  const [user, setUser]       = useState(null)   // Supabase auth user
-  const [profile, setProfile] = useState(null)   // public.users row
+  const [user, setUser] = useState(null)
+  const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
 
-  // Fetch profile from public.users
   async function fetchProfile(userId) {
-    // Return cached profile if same user — avoids DB round trip on every navigation
     if (_adminCacheUserId === userId && _adminCache) {
       setProfile(_adminCache)
       return _adminCache
@@ -35,7 +33,6 @@ export function AdminAuthProvider({ children }) {
       return null
     }
 
-    // Security: sign out only when we have a confirmed profile with the wrong role
     if (data.role !== 'super_admin' || !data.is_active) {
       await supabaseAdmin.auth.signOut()
       setUser(null)
@@ -66,23 +63,17 @@ export function AdminAuthProvider({ children }) {
           setLoading(true)
           const sessionUser = session?.user ?? null
           setUser(sessionUser)
-          if (sessionUser) {
-            await fetchProfile(sessionUser.id)
-          } else {
-            setProfile(null)
-          }
+          if (sessionUser) await fetchProfile(sessionUser.id)
+          else setProfile(null)
           setLoading(false)
           return
         }
-        // TOKEN_REFRESHED / USER_UPDATED — silent update, no loading change
         const sessionUser = session?.user ?? null
         if (sessionUser) setUser(sessionUser)
       }
     )
 
-    // Safety-net: if INITIAL_SESSION never fires, unblock ProtectedRoute after 8 s
     const timer = setTimeout(() => setLoading(false), 8000)
-
     return () => {
       clearTimeout(timer)
       subscription.unsubscribe()

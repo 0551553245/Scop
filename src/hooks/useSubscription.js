@@ -1,106 +1,88 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useEffect, useState } from 'react'
+import { getPlatformSettings, getPerBranchPricing } from '../lib/platformSettings'
 import { supabaseOwner } from '../lib/supabase'
 import { useOwnerAuth } from '../context/OwnerAuthContext'
-import { getPlatformSettings, getPerBranchPricing } from '../lib/platformSettings'
 
+/**
+ * Owner subscription hook. Recovers missing subscription rows with per_branch trial
+ * limits derived from platform_settings — never hardcoded (BUG #163/#164).
+ */
 export function useSubscription() {
   const { profile } = useOwnerAuth()
   const [subscription, setSubscription] = useState(null)
   const [loading, setLoading] = useState(true)
 
-  const fetchSubscription = useCallback(async () => {
-    if (!profile?.id) return
-    try {
+  useEffect(() => {
+    if (!profile?.id) {
+      setSubscription(null)
+      setLoading(false)
+      return
+    }
+
+    let cancelled = false
+
+    async function load() {
+      setLoading(true)
       const { data, error } = await supabaseOwner
         .from('subscriptions')
-        .select('id, plan, status, branches_limit, managers_limit, expires_at, trial_ends_at, started_at')
+        .select('*')
         .eq('owner_id', profile.id)
         .maybeSingle()
-      if (error) throw error
+
+      if (cancelled) return
+
+      if (error) {
+        setSubscription(null)
+        setLoading(false)
+        return
+      }
 
       if (!data) {
-        // Subscription row missing — registration insert failed silently. Recover now.
-        // No branch-count context available here, so recover with the minimal
-        // 1-branch entitlement (matches Register.jsx's pricing.calculateX(1))
-        // instead of a separate hardcoded literal that could drift from it.
-        const trialExpiry = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()
-        const settings = await getPlatformSettings(supabaseOwner)
-        const pricing  = getPerBranchPricing(settings)
-        const { error: insertErr } = await supabaseOwner.from('subscriptions').insert({
-          owner_id:       profile.id,
-          plan:           'per_branch',
-          status:         'trial',
-          branches_limit: 1,
-          managers_limit: pricing.calculateManagersLimit(1),
-          monthly_amount: pricing.calculateMonthlyAmount(1),
-          expires_at:     trialExpiry,
-          trial_ends_at:  trialExpiry,
-          started_at:     new Date().toISOString(),
-        })
-        if (insertErr) {
-          console.error('Subscription recovery insert failed:', insertErr)
-        } else {
-          fetchSubscription()
+        // Recovery insert — missing row after registration edge cases (BUG #067)
+        try {
+          const settings = await getPlatformSettings(supabaseOwner)
+          const pricing = getPerBranchPricing(settings)
+          const trialDays = parseInt(settings.trial_duration_days ?? '14', 10)
+          const branchCount = 1
+          const trialEnds = new Date()
+          trialEnds.setDate(trialEnds.getDate() + trialDays)
+
+          const { data: created } = await supabaseOwner
+            .from('subscriptions')
+            .insert({
+              owner_id: profile.id,
+              plan: 'per_branch',
+              status: 'trial',
+              branches_limit: branchCount,
+              managers_limit: pricing.calculateManagersLimit(branchCount),
+              monthly_amount: pricing.calculateMonthlyAmount(branchCount),
+              trial_ends_at: trialEnds.toISOString(),
+            })
+            .select('*')
+            .maybeSingle()
+
+          if (!cancelled) setSubscription(created)
+        } catch {
+          if (!cancelled) setSubscription(null)
         }
+        setLoading(false)
         return
       }
 
       setSubscription(data)
-    } catch (err) {
-      console.error('Subscription fetch error:', err)
-      setSubscription(null)
-    } finally {
       setLoading(false)
     }
+
+    load()
+    return () => { cancelled = true }
   }, [profile?.id])
 
-  useEffect(() => { fetchSubscription() }, [fetchSubscription])
+  const isExpired = subscription
+    ? subscription.status === 'expired' || subscription.status === 'blocked'
+    : false
 
-  // Real-time: reflect admin block/activate or plan changes immediately
-  useEffect(() => {
-    if (!profile?.id) return
+  const isTrial = subscription?.status === 'trial'
+  const isActive = subscription?.status === 'active' || isTrial
 
-    fetchSubscription()
-
-    const channelName = `owner-subscription-${profile.id}`
-    supabaseOwner.removeChannel(supabaseOwner.channel(channelName))
-
-    const ch = supabaseOwner
-      .channel(channelName)
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'subscriptions',
-        filter: `owner_id=eq.${profile.id}`,
-      }, () => fetchSubscription())
-      .subscribe()
-
-    return () => supabaseOwner.removeChannel(ch)
-  }, [profile?.id])
-
-  // Computed values
-  const isActive  = subscription?.status === 'active'
-  const isTrial   = subscription?.status === 'trial'
-  const isExpired = subscription?.status === 'expired' || subscription?.status === 'blocked'
-  const hasAccess = isActive || isTrial
-
-  // Days remaining
-  const daysLeft = subscription?.expires_at
-    ? Math.max(0, Math.ceil((new Date(subscription.expires_at) - new Date()) / 86400000))
-    : 0
-
-  // Warning: expiring soon (within 5 days)
-  const expiringSoon = hasAccess && daysLeft <= 5 && daysLeft > 0
-
-  return {
-    subscription,
-    loading,
-    isActive,
-    isTrial,
-    isExpired,
-    hasAccess,
-    daysLeft,
-    expiringSoon,
-    refetch: fetchSubscription,
-  }
+  return { subscription, loading, isExpired, isTrial, isActive, setSubscription }
 }

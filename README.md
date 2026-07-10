@@ -1,16 +1,49 @@
-# React + Vite
+# Scop
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Restaurant operations SaaS for Saudi Arabia — Owner, Branch Manager, and Super Admin panels.
 
-Currently, two official plugins are available:
+## Hard reset (in progress)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+This branch rebuilds the frontend from a clean `src/` while keeping:
 
-## React Compiler
+- `.claude/skills/` + `CLAUDE.md` (rules + bug log)
+- `supabase/migrations/`
+- Existing Supabase project + data
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+### Live now
+- Three isolated Supabase clients + auth contexts
+- Protected routes (user + profile, 8s timeout)
+- Owner / BM / Admin login
+- Owner register + email verify (user_metadata survives cross-browser)
+- Panel shells with mobile sidebar
+- Feature pages as rebuild placeholders
 
-## Expanding the ESLint configuration
+### Rebuild order
+1. Owner Branches + Managers (`create-manager` Edge Function)
+2. Owner Tasks → BM Daily/Weekly/Monthly submit
+3. Food Safety (owner standards → BM submit)
+4. Schedule
+5. Reports (via `src/lib/stats.js`)
+6. Subscription + Moyasar
+7. Admin panel
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## Run locally
+
+```bash
+npm install
+npm run dev
+```
+
+```bash
+npm run build   # required before done — 0 errors
+```
+
+## Panels
+
+| Panel | Path | Client | Session |
+|---|---|---|---|
+| Owner | `/owner/*` | `supabaseOwner` | `scop-owner-session` |
+| Branch Manager | `/branch-manager/*` | `supabaseBranchManager` | `scop-bm-session` |
+| Admin | `/admin/*` | `supabaseAdmin` | `scop-admin-session` |
+
+Never mix clients or auth contexts across panels.

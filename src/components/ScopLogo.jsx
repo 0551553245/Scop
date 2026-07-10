@@ -26,12 +26,9 @@ function Icon({ size }) {
 export default function ScopLogo({ variant = 'sidebar', className }) {
   if (variant === 'sidebar') {
     return (
-      <div
-        className={className}
-        style={{ display: 'flex', alignItems: 'center', gap: 8, direction: 'ltr' }}
-      >
+      <div className={className} style={{ display: 'flex', alignItems: 'center', gap: 8, direction: 'ltr' }}>
         <Icon size={28} />
-        <span style={{ fontSize: 17, fontWeight: 700, color: '#1B4332', letterSpacing: '0.5px', fontFamily: 'Inter, sans-serif' }}>
+        <span style={{ fontSize: 17, fontWeight: 700, color: '#1B4332', letterSpacing: '0.5px' }}>
           Scop
         </span>
       </div>
@@ -39,21 +36,17 @@ export default function ScopLogo({ variant = 'sidebar', className }) {
   }
 
   return (
-    <div
-      className={className}
-      style={{ display: 'flex', alignItems: 'center', gap: 10, direction: 'ltr' }}
-    >
+    <div className={className} style={{ display: 'flex', alignItems: 'center', gap: 10, direction: 'ltr' }}>
       <Icon size={36} />
       <div>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-          <span style={{ fontSize: 20, fontWeight: 700, color: '#1B4332', letterSpacing: '0.5px', fontFamily: 'Inter, sans-serif' }}>
-            Scop
-          </span>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#1B4332', fontFamily: 'Cairo, sans-serif' }}>
-            سكوب
-          </span>
+          <span style={{ fontSize: 20, fontWeight: 700, color: '#1B4332', letterSpacing: '0.5px' }}>Scop</span>
+          <span style={{ fontSize: 15, fontWeight: 600, color: '#1B4332', fontFamily: 'Cairo, sans-serif' }}>سكوب</span>
         </div>
-        <div style={{ fontSize: 9, fontWeight: 600, color: '#9CA3AF', letterSpacing: '1.5px', textTransform: 'uppercase', fontFamily: 'Inter, sans-serif', marginTop: 1 }}>
+        <div style={{
+          fontSize: 9, fontWeight: 600, color: '#9CA3AF', letterSpacing: '1.5px',
+          textTransform: 'uppercase', marginTop: 1,
+        }}>
           Restaurant Operations
         </div>
       </div>

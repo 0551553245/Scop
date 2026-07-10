@@ -4,7 +4,7 @@ const LanguageContext = createContext(null)
 
 export function LanguageProvider({ children }) {
   const [lang, setLang] = useState(() => localStorage.getItem('scop-lang') || 'en')
-  const isAr  = lang === 'ar'
+  const isAr = lang === 'ar'
   const isRTL = isAr
 
   function toggleLang() {
