@@ -242,7 +242,15 @@ export default function OwnerRegister() {
         email: form.email,
         password: form.password,
         options: {
-          data:            { name: form.ownerName, branch_count: branchCount },
+          data: {
+            name: form.ownerName,
+            name_ar: form.nameAr || null,
+            phone: form.phone.trim(),
+            branch_count: branchCount,
+            restaurant_name: form.restaurantName.trim(),
+            restaurant_name_ar: form.restaurantNameAr.trim() || form.restaurantName.trim(),
+            city: form.city,
+          },
           emailRedirectTo: 'https://scopsa.com/verify',
         },
       })

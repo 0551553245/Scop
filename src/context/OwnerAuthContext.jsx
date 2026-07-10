@@ -7,13 +7,11 @@ let _profileCache = null
 let _profileCacheUserId = null
 
 export function OwnerAuthProvider({ children }) {
-  const [user, setUser]       = useState(null)   // Supabase auth user
-  const [profile, setProfile] = useState(null)   // public.users row
+  const [user, setUser] = useState(null)
+  const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
 
-  // Fetch profile from public.users
   async function fetchProfile(userId) {
-    // Return cached profile if same user — avoids DB round trip on every navigation
     if (_profileCacheUserId === userId && _profileCache) {
       setProfile(_profileCache)
       return _profileCache
@@ -25,6 +23,7 @@ export function OwnerAuthProvider({ children }) {
       .eq('id', userId)
       .single()
 
+    // Path B: missing profile → signOut (BUG #148 / #144)
     if (error || !data) {
       await supabaseOwner.auth.signOut()
       setUser(null)
@@ -35,7 +34,6 @@ export function OwnerAuthProvider({ children }) {
       return null
     }
 
-    // Security: sign out only when we have a confirmed profile with the wrong role
     if (data.role !== 'owner' || !data.is_active) {
       await supabaseOwner.auth.signOut()
       setUser(null)
@@ -66,23 +64,17 @@ export function OwnerAuthProvider({ children }) {
           setLoading(true)
           const sessionUser = session?.user ?? null
           setUser(sessionUser)
-          if (sessionUser) {
-            await fetchProfile(sessionUser.id)
-          } else {
-            setProfile(null)
-          }
+          if (sessionUser) await fetchProfile(sessionUser.id)
+          else setProfile(null)
           setLoading(false)
           return
         }
-        // TOKEN_REFRESHED / USER_UPDATED — silent update, no loading change
         const sessionUser = session?.user ?? null
         if (sessionUser) setUser(sessionUser)
       }
     )
 
-    // Safety-net: if INITIAL_SESSION never fires, unblock ProtectedRoute after 5 s
     const timer = setTimeout(() => setLoading(false), 5000)
-
     return () => {
       clearTimeout(timer)
       subscription.unsubscribe()
@@ -98,7 +90,7 @@ export function OwnerAuthProvider({ children }) {
   }
 
   return (
-    <OwnerAuthContext.Provider value={{ user, profile, loading, signOut }}>
+    <OwnerAuthContext.Provider value={{ user, profile, loading, signOut, setUser, setProfile }}>
       {children}
     </OwnerAuthContext.Provider>
   )

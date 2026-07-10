@@ -15,8 +15,7 @@ export const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: { storageKey: 'scop-admin-session' },
 })
 
-// Ephemeral client for creating new accounts (e.g. manager signup) without
-// touching the owner's or branch manager's active session.
+// Ephemeral client for signup — never shares session with panel clients
 export const supabaseTemp = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: { storageKey: 'scop-temp-signup', persistSession: false },
 })

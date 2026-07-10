@@ -24,13 +24,12 @@ async function fetchOwnerSubscription(branchId) {
 }
 
 export function BranchManagerAuthProvider({ children }) {
-  const [user,    setUser]    = useState(null)   // Supabase auth user
-  const [profile, setProfile] = useState(null)   // public.users row
+  const [user, setUser] = useState(null)
+  const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
   const [ownerSubscription, setOwnerSubscription] = useState(undefined)
 
   async function fetchProfile(userId) {
-    // Return cached profile if same user — avoids DB round trip on every navigation
     if (_bmProfileCacheUserId === userId && _bmProfileCache) {
       setProfile(_bmProfileCache)
       fetchOwnerSubscription(_bmProfileCache.branch_id).then(setOwnerSubscription)
@@ -54,7 +53,6 @@ export function BranchManagerAuthProvider({ children }) {
       return null
     }
 
-    // Security: sign out only when we have a confirmed profile with the wrong role
     if (data.role !== 'branch_manager' || !data.is_active) {
       await supabaseBranchManager.auth.signOut()
       setUser(null)
@@ -88,36 +86,28 @@ export function BranchManagerAuthProvider({ children }) {
           setLoading(true)
           const sessionUser = session?.user ?? null
           setUser(sessionUser)
-          if (sessionUser) {
-            await fetchProfile(sessionUser.id)
-          } else {
-            setProfile(null)
-          }
+          if (sessionUser) await fetchProfile(sessionUser.id)
+          else setProfile(null)
           setLoading(false)
           return
         }
-        // TOKEN_REFRESHED / USER_UPDATED — silent update, no loading change
         const sessionUser = session?.user ?? null
         if (sessionUser) setUser(sessionUser)
       }
     )
 
-    // Re-check profile when tab becomes active — catches deactivation while away
     const handleVisibility = async () => {
-      if (document.visibilityState === 'visible') {
-        const { data: { session } } = await supabaseBranchManager.auth.getSession()
-        if (session?.user) {
-          _bmProfileCache = null
-          _bmProfileCacheUserId = null
-          await fetchProfile(session.user.id)
-        }
+      if (document.visibilityState !== 'visible') return
+      const { data: { session } } = await supabaseBranchManager.auth.getSession()
+      if (session?.user) {
+        _bmProfileCache = null
+        _bmProfileCacheUserId = null
+        await fetchProfile(session.user.id)
       }
     }
     document.addEventListener('visibilitychange', handleVisibility)
 
-    // Safety-net: if INITIAL_SESSION never fires, unblock ProtectedRoute after 5 s
     const timer = setTimeout(() => setLoading(false), 5000)
-
     return () => {
       clearTimeout(timer)
       subscription.unsubscribe()
@@ -134,16 +124,17 @@ export function BranchManagerAuthProvider({ children }) {
     setOwnerSubscription(null)
   }
 
+  // Fail-closed: undefined = still loading, null/expired = no access (BUG #048/#109)
   const ownerHasAccess = ownerSubscription === undefined
-    ? null  // still fetching
+    ? null
     : ownerSubscription === null
-    ? false  // no subscription row = no access (fail-closed)
-    : (ownerSubscription.status === 'active' || ownerSubscription.status === 'trial')
-    ? true
-    : false
+      ? false
+      : (ownerSubscription.status === 'active' || ownerSubscription.status === 'trial')
 
   return (
-    <BranchManagerAuthContext.Provider value={{ user, profile, loading, signOut, ownerSubscription, ownerHasAccess }}>
+    <BranchManagerAuthContext.Provider value={{
+      user, profile, loading, signOut, ownerSubscription, ownerHasAccess,
+    }}>
       {children}
     </BranchManagerAuthContext.Provider>
   )
