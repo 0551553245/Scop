@@ -30,17 +30,11 @@ export default function AdminSettings() {
   const [saving,  setSaving]  = useState(false)
   const [saveMsg, setSaveMsg] = useState('')
 
-  const [priceStarter,    setPriceStarter]    = useState(199)
-  const [priceGrowth,     setPriceGrowth]     = useState(499)
-  const [pricePro,        setPricePro]        = useState(999)
-  const [trialDuration,   setTrialDuration]   = useState(14)
-  const [supportWhatsapp, setSupportWhatsapp] = useState('')
-  const [starterBranches, setStarterBranches] = useState(1)
-  const [starterManagers, setStarterManagers] = useState(1)
-  const [growthBranches,  setGrowthBranches]  = useState(5)
-  const [growthManagers,  setGrowthManagers]  = useState(5)
-  const [proBranches,     setProBranches]     = useState(15)
-  const [proManagers,     setProManagers]     = useState(99)
+  const [pricePerBranch,      setPricePerBranch]      = useState(50)
+  const [managersPerBranch,   setManagersPerBranch]   = useState(2)
+  const [enterpriseThreshold, setEnterpriseThreshold] = useState(10)
+  const [trialDuration,       setTrialDuration]       = useState(14)
+  const [supportWhatsapp,     setSupportWhatsapp]     = useState('')
 
   async function logAction(action, description, targetId, targetType, metadata) {
     await supabaseAdmin.from('activity_log').insert({
@@ -58,17 +52,11 @@ export default function AdminSettings() {
     const cacheKey = `admin-settings-${profile.id}`
     const cached   = getCached(cacheKey)
     if (cached) {
-      setPriceStarter(cached.priceStarter)
-      setPriceGrowth(cached.priceGrowth)
-      setPricePro(cached.pricePro)
+      setPricePerBranch(cached.pricePerBranch)
+      setManagersPerBranch(cached.managersPerBranch)
+      setEnterpriseThreshold(cached.enterpriseThreshold)
       setTrialDuration(cached.trialDuration)
       setSupportWhatsapp(cached.supportWhatsapp)
-      setStarterBranches(cached.starterBranches)
-      setStarterManagers(cached.starterManagers)
-      setGrowthBranches(cached.growthBranches)
-      setGrowthManagers(cached.growthManagers)
-      setProBranches(cached.proBranches)
-      setProManagers(cached.proManagers)
       setLoading(false)
     }
 
@@ -82,30 +70,18 @@ export default function AdminSettings() {
       const settings = Object.fromEntries((data || []).map(s => [s.key, s.value]))
 
       const resolved = {
-        priceStarter:    settings.price_starter       !== undefined ? Number(settings.price_starter)       : priceStarter,
-        priceGrowth:     settings.price_growth        !== undefined ? Number(settings.price_growth)        : priceGrowth,
-        pricePro:        settings.price_pro           !== undefined ? Number(settings.price_pro)           : pricePro,
-        trialDuration:   settings.trial_duration_days !== undefined ? Number(settings.trial_duration_days) : trialDuration,
-        supportWhatsapp: settings.support_whatsapp    !== undefined ? settings.support_whatsapp             : supportWhatsapp,
-        starterBranches: settings.starter_branches    !== undefined ? Number(settings.starter_branches)    : starterBranches,
-        starterManagers: settings.starter_managers    !== undefined ? Number(settings.starter_managers)    : starterManagers,
-        growthBranches:  settings.growth_branches     !== undefined ? Number(settings.growth_branches)     : growthBranches,
-        growthManagers:  settings.growth_managers     !== undefined ? Number(settings.growth_managers)     : growthManagers,
-        proBranches:     settings.pro_branches        !== undefined ? Number(settings.pro_branches)        : proBranches,
-        proManagers:     settings.pro_managers        !== undefined ? Number(settings.pro_managers)        : proManagers,
+        pricePerBranch:      settings.price_per_branch            !== undefined ? Number(settings.price_per_branch)            : pricePerBranch,
+        managersPerBranch:   settings.managers_per_branch         !== undefined ? Number(settings.managers_per_branch)         : managersPerBranch,
+        enterpriseThreshold: settings.enterprise_branch_threshold !== undefined ? Number(settings.enterprise_branch_threshold) : enterpriseThreshold,
+        trialDuration:       settings.trial_duration_days         !== undefined ? Number(settings.trial_duration_days)         : trialDuration,
+        supportWhatsapp:     settings.support_whatsapp            !== undefined ? settings.support_whatsapp                    : supportWhatsapp,
       }
 
-      setPriceStarter(resolved.priceStarter)
-      setPriceGrowth(resolved.priceGrowth)
-      setPricePro(resolved.pricePro)
+      setPricePerBranch(resolved.pricePerBranch)
+      setManagersPerBranch(resolved.managersPerBranch)
+      setEnterpriseThreshold(resolved.enterpriseThreshold)
       setTrialDuration(resolved.trialDuration)
       setSupportWhatsapp(resolved.supportWhatsapp)
-      setStarterBranches(resolved.starterBranches)
-      setStarterManagers(resolved.starterManagers)
-      setGrowthBranches(resolved.growthBranches)
-      setGrowthManagers(resolved.growthManagers)
-      setProBranches(resolved.proBranches)
-      setProManagers(resolved.proManagers)
       setCached(cacheKey, resolved, 60000)
 
     } catch (err) {
@@ -129,17 +105,11 @@ export default function AdminSettings() {
     setSaving(true)
     try {
       const rows = [
-        { key: 'price_starter',       value: String(priceStarter) },
-        { key: 'price_growth',        value: String(priceGrowth) },
-        { key: 'price_pro',           value: String(pricePro) },
-        { key: 'trial_duration_days', value: String(trialDuration) },
-        { key: 'support_whatsapp',    value: supportWhatsapp.trim() },
-        { key: 'starter_branches',    value: String(starterBranches) },
-        { key: 'starter_managers',    value: String(starterManagers) },
-        { key: 'growth_branches',     value: String(growthBranches) },
-        { key: 'growth_managers',     value: String(growthManagers) },
-        { key: 'pro_branches',        value: String(proBranches) },
-        { key: 'pro_managers',        value: String(proManagers) },
+        { key: 'price_per_branch',            value: String(pricePerBranch) },
+        { key: 'managers_per_branch',         value: String(managersPerBranch) },
+        { key: 'enterprise_branch_threshold', value: String(enterpriseThreshold) },
+        { key: 'trial_duration_days',         value: String(trialDuration) },
+        { key: 'support_whatsapp',            value: supportWhatsapp.trim() },
       ].map(r => ({ ...r, updated_at: new Date().toISOString() }))
 
       const { error: err } = await supabaseAdmin
@@ -186,46 +156,22 @@ export default function AdminSettings() {
           <form onSubmit={handleSave}>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:20, marginBottom:20 }}>
 
-              {/* Plan pricing */}
+              {/* Per-branch pricing */}
               <div style={{ background:'#fff', border:'0.5px solid #E5E7EB', borderRadius:12, padding:20 }}>
-                <div style={{ fontSize:14, fontWeight:700, color:'#111827', marginBottom:16 }}>{isAr ? 'تسعير الخطط' : 'Plan Pricing'}</div>
+                <div style={{ fontSize:14, fontWeight:700, color:'#111827', marginBottom:16 }}>{isAr ? 'التسعير لكل فرع' : 'Per-Branch Pricing'}</div>
                 <div style={{ marginBottom:12 }}>
-                  <label style={labelStyle}>Starter (SAR)</label>
-                  <input type="number" min="0" value={priceStarter} onChange={e => setPriceStarter(e.target.value)} style={inputStyle} />
+                  <label style={labelStyle}>{isAr ? 'السعر لكل فرع (ريال)' : 'Price per branch (SAR)'}</label>
+                  <input type="number" min="0" value={pricePerBranch} onChange={e => setPricePerBranch(e.target.value)} style={inputStyle} />
                 </div>
                 <div style={{ marginBottom:12 }}>
-                  <label style={labelStyle}>Growth (SAR)</label>
-                  <input type="number" min="0" value={priceGrowth} onChange={e => setPriceGrowth(e.target.value)} style={inputStyle} />
+                  <label style={labelStyle}>{isAr ? 'المديرون لكل فرع' : 'Managers per branch'}</label>
+                  <input type="number" min="1" value={managersPerBranch} onChange={e => setManagersPerBranch(e.target.value)} style={inputStyle} />
                 </div>
                 <div>
-                  <label style={labelStyle}>Pro (SAR)</label>
-                  <input type="number" min="0" value={pricePro} onChange={e => setPricePro(e.target.value)} style={inputStyle} />
+                  <label style={labelStyle}>{isAr ? 'حد المؤسسات (فروع)' : 'Enterprise threshold (branches)'}</label>
+                  <input type="number" min="1" value={enterpriseThreshold} onChange={e => setEnterpriseThreshold(e.target.value)} style={inputStyle} />
                 </div>
-              </div>
-
-              {/* Plan limits */}
-              <div style={{ background:'#fff', border:'0.5px solid #E5E7EB', borderRadius:12, padding:20 }}>
-                <div style={{ fontSize:14, fontWeight:700, color:'#111827', marginBottom:16 }}>{isAr ? 'حدود الخطط' : 'Plan Limits'}</div>
-                {[
-                  { plan:'Starter', branches: starterBranches, setBranches: setStarterBranches, managers: starterManagers, setManagers: setStarterManagers },
-                  { plan:'Growth',  branches: growthBranches,  setBranches: setGrowthBranches,  managers: growthManagers,  setManagers: setGrowthManagers  },
-                  { plan:'Pro',     branches: proBranches,     setBranches: setProBranches,     managers: proManagers,     setManagers: setProManagers     },
-                ].map(p => (
-                  <div key={p.plan} style={{ marginBottom:12 }}>
-                    <div style={{ fontSize:11, fontWeight:600, color:'#374151', marginBottom:6 }}>{p.plan}</div>
-                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
-                      <div>
-                        <label style={{ ...labelStyle, fontSize:10 }}>{isAr ? 'فروع' : 'Branches'}</label>
-                        <input type="number" min="1" value={p.branches} onChange={e => p.setBranches(e.target.value)} style={inputStyle} />
-                      </div>
-                      <div>
-                        <label style={{ ...labelStyle, fontSize:10 }}>{isAr ? 'مديرون' : 'Managers'}</label>
-                        <input type="number" min="1" value={p.managers} onChange={e => p.setManagers(e.target.value)} style={inputStyle} />
-                      </div>
-                    </div>
-                  </div>
-                ))}
-                <div style={{ fontSize:11, color:'#9CA3AF', marginTop:4 }}>{isAr ? 'الحدود مطبقة تلقائياً.' : 'Limits are enforced automatically.'}</div>
+                <div style={{ fontSize:11, color:'#9CA3AF', marginTop:12 }}>{isAr ? 'يُطبَّق تلقائياً على التسجيلات الجديدة.' : 'Applied automatically to new signups.'}</div>
               </div>
 
               {/* Trial settings */}
